@@ -17,23 +17,23 @@ namespace blackbone
 /// <param name="prot">Memory protection flags</param>
 /// <param name="bDEP">DEP flag</param>
 /// <returns>New protection flags</returns>
-inline DWORD CastProtection( DWORD prot, bool bDEP )
+inline DWORD CastProtection( DWORD prot, bool /*bDEP*/ )
 {
-    if (bDEP == true)
+//     if (bDEP == true)
     {
         return prot;
     }
-    else
-    {
-        if (prot == PAGE_EXECUTE_READ)
-            return PAGE_READONLY;
-        else if (prot == PAGE_EXECUTE_READWRITE)
-            return PAGE_READWRITE;
-        else if (prot == PAGE_EXECUTE_WRITECOPY)
-            return PAGE_WRITECOPY;
-        else
-            return prot;
-    }
+//     else
+//     {
+//         if (prot == PAGE_EXECUTE_READ)
+//             return PAGE_READONLY;
+//         else if (prot == PAGE_EXECUTE_READWRITE)
+//             return PAGE_READWRITE;
+//         else if (prot == PAGE_EXECUTE_WRITECOPY)
+//             return PAGE_WRITECOPY;
+//         else
+//             return prot;
+//     }
 }
 
 class MemBlock
