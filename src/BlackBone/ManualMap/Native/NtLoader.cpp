@@ -832,14 +832,13 @@ template<typename T>
 bool NtLdr::FindLdrHeap()
 {
     int32_t retries = 50;
-    _PEB_T<T> Peb = { 0 };
+    if (_process.core().peb<T>( &peb ) != 0)
+    {
+        _LdrHeapBase = peb.ProcessHeap;
+        return true;
+    }
 
-    _process.core().peb<T>( &Peb );
-    for (; Peb.Ldr == 0 && retries > 0; retries--, Sleep( 10 ))
-        _process.core().peb<T>( &Peb );
-
-    _LdrHeapBase = Peb.ProcessHeap;
-    return true;
+    return false;
 }
 
 /// <summary>
