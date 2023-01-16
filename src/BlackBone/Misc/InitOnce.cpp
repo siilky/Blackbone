@@ -23,18 +23,24 @@ public:
     InitOnce( InitOnce&& ) = delete;
     InitOnce& operator=( InitOnce&& ) = delete;
 
-    static bool Exec()
+    static bool Exec(InitOptions options)
     {
         if (!_InterlockedCompareExchange( &_done, TRUE, FALSE ))
         {
             InitVersion();
 
-            GrantPriviledge( L"SeDebugPrivilege" );
-            GrantPriviledge( L"SeLoadDriverPrivilege" );
+            if ((options & InitOptions::AcquirePriveleges) != 0)
+            {
+                GrantPriviledge( L"SeDebugPrivilege" );
+                GrantPriviledge( L"SeLoadDriverPrivilege" );
+            }
             LoadFuncs();
 
-            SymbolLoader sl;
-            sl.Load( g_symbols );
+            if ((options & InitOptions::LoadSymbols) != 0)
+            {
+                SymbolLoader sl;
+                sl.Load( g_symbols );
+            }
 
             NameResolve::Instance().Initialize();
         }
@@ -125,10 +131,10 @@ private:
 /// Exported InitOnce wrapper
 /// </summary>
 /// <returns>true on initialization completion</returns>
-bool InitializeOnce()
+bool InitializeOnce(InitOptions options)
 {
     // Static flag is still unsafe because of magic statics
-    return InitOnce::Exec();
+    return InitOnce::Exec(options);
 }
 
 volatile long InitOnce::_done = 0;
