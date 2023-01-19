@@ -3,7 +3,9 @@
 #include "../Include/Macro.h"
 
 #define BEA_USE_STDCALL
-//#define BEA_ENGINE_STATIC
+#if defined(BLACKBONE_STATIC)
+	#define BEA_ENGINE_STATIC
+#endif
 #include <3rd_party/BeaEngine/headers/BeaEngine.h>
 
 #include <algorithm>

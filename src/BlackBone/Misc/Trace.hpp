@@ -12,6 +12,44 @@ namespace blackbone
 {
 #ifndef BLACKBONE_NO_TRACE
 
+    class FileWriter
+    {
+    public:
+        FileWriter()
+        {
+            char buf[2048];
+
+            GetTempFileNameA("f:\\temp\\", "bb", GetCurrentProcessId(), buf);
+            auto r = fopen_s(&stream, buf, "wb");
+            if (r != 0)
+            {
+                stream = nullptr;
+
+                sprintf_s(buf, "FileQriter: %i\r\n", r);
+                OutputDebugStringA(buf);
+            }
+        }
+
+        static FileWriter * instance()
+        {
+            static FileWriter w;
+            return &w;
+        }
+
+         FILE* file() const
+        {
+            return stream;
+        }
+
+        bool isOk() const
+        {
+            return stream != nullptr;
+        }
+
+    private:
+        FILE *stream;
+    };
+
 inline void DoTraceV( const char* fmt, va_list va_args )
 {
     char buf[2048], userbuf[1024];
@@ -22,6 +60,11 @@ inline void DoTraceV( const char* fmt, va_list va_args )
 #ifdef CONSOLE_TRACE
     printf_s( buf );
 #endif
+    if (FileWriter::instance()->isOk())
+    {
+        fprintf_s(FileWriter::instance()->file(), buf);
+        fflush(FileWriter::instance()->file());
+    }
 }
 
 inline void DoTraceV( const wchar_t* fmt, va_list va_args )
@@ -34,6 +77,11 @@ inline void DoTraceV( const wchar_t* fmt, va_list va_args )
 #ifdef CONSOLE_TRACE
     wprintf_s( buf );
 #endif
+    if (FileWriter::instance()->isOk())
+    {
+        fwprintf_s(FileWriter::instance()->file(), buf);
+        fflush(FileWriter::instance()->file());
+    }
 }
 
 template<typename Ch>
