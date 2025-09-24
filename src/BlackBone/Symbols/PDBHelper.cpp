@@ -28,7 +28,7 @@ PDBHelper::PDBHelper()
         if (GetTempPathW( _countof( path ), path ) != 0)
         {
             std::wstringstream wss;
-            wss << L"srv*" << path << L"Symbols*http://msdl.microsoft.com/download/symbols";
+            wss << L"srv*" << path << L"symbols*https://msdl.microsoft.com/download/symbols";
             _sympath = wss.str();
         }
     }
