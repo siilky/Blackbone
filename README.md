@@ -1,6 +1,6 @@
 # Blackbone
 
-### Windows memory hacking library
+### Windows memory library
 
 ## Features
 
