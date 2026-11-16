@@ -2,7 +2,7 @@
 #include "../include/Types.h"
 #include <3rd_party/DIA/dia2.h>
 #include <Objbase.h>
-#include <atlcomcli.h>
+#include <wrl/client.h>
 #include <string>
 #include <unordered_map>
 
@@ -46,9 +46,9 @@ private:
 
 private:
     // DIA interfaces
-    CComPtr<IDiaDataSource> _source;
-    CComPtr<IDiaSession>    _session;
-    CComPtr<IDiaSymbol>     _global;
+    Microsoft::WRL::ComPtr<IDiaDataSource> _source;
+    Microsoft::WRL::ComPtr<IDiaSession>    _session;
+    Microsoft::WRL::ComPtr<IDiaSymbol>     _global;
 
     uint64_t _base = 0;                                     // Base ptr to add to RVAs
     std::wstring _sympath;                                  // Symbol cache directory

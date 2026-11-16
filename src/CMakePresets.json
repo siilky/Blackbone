@@ -1,0 +1,33 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "description": "Run from a Visual Studio developer shell; its target architecture selects the compiler and names the build directory",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/../build/$env{VSCMD_ARG_TGT_ARCH}-${presetName}"
+    },
+    {
+      "name": "static-mt",
+      "inherits": "base",
+      "displayName": "Static library, static CRT",
+      "cacheVariables": { "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>" }
+    },
+    {
+      "name": "static-md",
+      "inherits": "base",
+      "displayName": "Static library, DLL CRT",
+      "cacheVariables": { "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL" }
+    },
+    {
+      "name": "dll",
+      "inherits": "base",
+      "displayName": "DLL, DLL CRT",
+      "cacheVariables": {
+        "BUILD_SHARED_LIBS": "ON",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+      }
+    }
+  ]
+}

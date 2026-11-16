@@ -4,18 +4,16 @@ Read this before implementation, review, or delegation. [Agent skill configurati
 
 ## Build and test
 
-Each PowerShell tool call starts a fresh shell without MSBuild, VSTest, or the compiler on `PATH`. Activate the Visual Studio developer shell in the same call as every build, test, or CMake command:
+Each PowerShell tool call starts a fresh shell without CMake, Ninja, MSBuild, VSTest, or the compiler on `PATH`. `scripts/build.ps1` activates the Visual Studio developer shell itself; run it as described in [Build, Test, and Development Commands](../../AGENTS.md#build-test-and-development-commands). Any other build, test, or CMake command needs the activation in the same call; use `-Arch x86` for 32-bit builds:
 
 ```powershell
 $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
 & "$vs\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64 -SkipAutomaticLocation | Out-Null
 ```
 
-The activation prints `'vswhere.exe' is not recognized`; that line is harmless. Then run the commands from [Build, Test, and Development Commands](../../AGENTS.md#build-test-and-development-commands) from the repository root.
+The activation prints `'vswhere.exe' is not recognized`; that line is harmless. A second activation in the same process keeps the first architecture, so the preset would configure the wrong build directory: use a new process per architecture, as the script does.
 
-Run one MSBuild or VSTest process at a time in the checkout. Builds share `obj/` and `build/<platform>/<configuration>/`, and a test run loads the DLLs a concurrent build rewrites. Run each build or test as one foreground call whose timeout covers it.
-
-A compiler error in `atlbase.h`, `atlcomcli.h`, or a missing Spectre library is a missing Visual Studio component (see the prerequisites in `README.md`), not a repository defect: report it as an environment blocker.
+Run one build or VSTest process at a time per build directory: a build rewrites `build/<arch>-<preset>/`, and a test run loads the DLLs from it. Different architectures and presets use separate directories. Run each build or test as one call whose timeout covers it.
 
 ## Workspace
 

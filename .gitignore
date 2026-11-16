@@ -85,4 +85,5 @@ GeneratedFiles*/
 *.db-shm
 *.db-wal
 *.json
+!/src/CMakePresets.json
 .scratch/

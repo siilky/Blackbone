@@ -40,7 +40,7 @@ bool ImageNET::Init( const std::wstring& path )
 
         hr = CoCreateInstance(
             CLSID_CorMetaDataDispenser, NULL, CLSCTX_INPROC_SERVER,
-            IID_IMetaDataDispenserEx, reinterpret_cast<void**>(&_pMetaDisp)
+            IID_IMetaDataDispenserEx, reinterpret_cast<void**>(_pMetaDisp.GetAddressOf())
             );
 
         if (FAILED( hr ))
@@ -52,7 +52,7 @@ bool ImageNET::Init( const std::wstring& path )
     //
     if(!_pMetaImport)
     {
-        hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
+        hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(_pMetaImport.GetAddressOf()) );
         if (hr == CLDB_E_BADUPDATEMODE)
         {
             V_VT( &value ) = VT_UI4;
@@ -61,7 +61,7 @@ bool ImageNET::Init( const std::wstring& path )
             if (FAILED( hr = _pMetaDisp->SetOption( MetaDataSetUpdate, &value ) ))
                 return false;
 
-            hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
+            hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(_pMetaImport.GetAddressOf()) );
         }
 
         if (FAILED( hr ))
@@ -70,7 +70,7 @@ bool ImageNET::Init( const std::wstring& path )
 
     if(!_pAssemblyImport)
     {
-        hr = _pMetaImport->QueryInterface( IID_IMetaDataAssemblyImport, reinterpret_cast<void**>(&_pAssemblyImport) );
+        hr = _pMetaImport->QueryInterface( IID_IMetaDataAssemblyImport, reinterpret_cast<void**>(_pAssemblyImport.GetAddressOf()) );
         if (FAILED( hr ))
             return false;
     }
@@ -146,7 +146,7 @@ std::wstring ImageNET::GetImageRuntimeVer( const wchar_t* ImagePath )
 {
     std::wstring LatestVersion = L"n/a";
 
-    CComPtr<ICLRMetaHost> MetaHost;
+    Microsoft::WRL::ComPtr<ICLRMetaHost> MetaHost;
     
     // Check if .NET 4 or higher is present
     auto clrCreate = reinterpret_cast<fnCLRCreateInstancen>(
@@ -169,19 +169,19 @@ std::wstring ImageNET::GetImageRuntimeVer( const wchar_t* ImagePath )
     // Get highest available
     else
     {
-        if (FAILED( clrCreate( CLSID_CLRMetaHost, IID_ICLRMetaHost, reinterpret_cast<LPVOID*>(&MetaHost) ) ))
+        if (FAILED( clrCreate( CLSID_CLRMetaHost, IID_ICLRMetaHost, reinterpret_cast<LPVOID*>(MetaHost.GetAddressOf()) ) ))
             return LatestVersion;
 
-        CComPtr<IEnumUnknown> Runtimes;
+        Microsoft::WRL::ComPtr<IEnumUnknown> Runtimes;
         if (FAILED( MetaHost->EnumerateInstalledRuntimes( &Runtimes ) ))
             return LatestVersion;
 
-        CComPtr<IUnknown> Runtime;
-        CComPtr<ICLRRuntimeInfo> Latest;
+        Microsoft::WRL::ComPtr<IUnknown> Runtime;
+        Microsoft::WRL::ComPtr<ICLRRuntimeInfo> Latest;
 
         while (Runtimes->Next( 1, &Runtime, NULL ) == S_OK)
         {
-            CComPtr<ICLRRuntimeInfo> Current;
+            Microsoft::WRL::ComPtr<ICLRRuntimeInfo> Current;
             wchar_t tmpString[MAX_PATH];
             DWORD tmp = MAX_PATH * sizeof(wchar_t);
 
@@ -203,14 +203,14 @@ std::wstring ImageNET::GetImageRuntimeVer( const wchar_t* ImagePath )
                         if (CurrentVersion.compare( LatestVersion ) > 0)
                         {
                             LatestVersion = CurrentVersion;
-                            Latest.Release();
+                            Latest.Reset();
                             Current->QueryInterface( IID_PPV_ARGS( &Latest ) );
                         }
                     }
                 }
             }
 
-            Runtime.Release();
+            Runtime.Reset();
         }
 
         return LatestVersion;

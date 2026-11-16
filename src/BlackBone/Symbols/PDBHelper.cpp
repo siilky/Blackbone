@@ -2,6 +2,7 @@
 #include "../Misc/Trace.hpp"
 
 #include <cstdint>
+#include <memory>
 #include <sstream>
 
 #define CHECK_SUCCESS(e)\
@@ -37,9 +38,9 @@ PDBHelper::PDBHelper()
 PDBHelper::~PDBHelper()
 {
     // Must be released before CoUninitialize
-    _global.Release();
-    _session.Release();
-    _source.Release();
+    _global.Reset();
+    _session.Reset();
+    _source.Reset();
 
     CoUninitialize();
 }
@@ -85,7 +86,7 @@ HRESULT PDBHelper::GetSymAddress( const std::wstring& symName, ptr_t& result )
 /// <returns>Status code</returns>
 HRESULT PDBHelper::CoCreateDiaDataSource()
 {
-    const auto pSource = reinterpret_cast<void**>(&_source);
+    const auto pSource = reinterpret_cast<void**>(_source.ReleaseAndGetAddressOf());
 
     // Try to get from COM
     HRESULT hr = CoCreateInstance( CLSID_DiaSource, nullptr, CLSCTX_INPROC_SERVER, __uuidof(IDiaDataSource), pSource );
@@ -109,8 +110,8 @@ HRESULT PDBHelper::CoCreateDiaDataSource()
             return HRESULT_FROM_WIN32( err );
         }
 
-        CComPtr<IClassFactory> classFactory;
-        CHECK_SUCCESS( DllGetClassObject( CLSID_DiaSource, IID_IClassFactory, &classFactory ) );
+        Microsoft::WRL::ComPtr<IClassFactory> classFactory;
+        CHECK_SUCCESS( DllGetClassObject( CLSID_DiaSource, IID_IClassFactory, classFactory.GetAddressOf() ) );
         hr = classFactory->CreateInstance( nullptr, IID_IDiaDataSource, pSource );
     }
 
@@ -128,18 +129,19 @@ HRESULT PDBHelper::CoCreateDiaDataSource()
 /// <returns>Status code</returns>
 HRESULT PDBHelper::PopulateSymbols()
 {
-    CComPtr<IDiaEnumSymbols> symbols;
+    Microsoft::WRL::ComPtr<IDiaEnumSymbols> symbols;
     CHECK_SUCCESS( _global->findChildren( SymTagNull, nullptr, nsNone, &symbols ) );
 
     ULONG count = 0;
-    CComPtr<IDiaSymbol> symbol;
+    Microsoft::WRL::ComPtr<IDiaSymbol> symbol;
     while (SUCCEEDED( symbols->Next( 1, &symbol, &count ) ) && count != 0)
     {
         DWORD rva = 0;
-        CComBSTR name;
+        BSTR name = nullptr;
 
         symbol->get_relativeVirtualAddress( &rva );
         symbol->get_undecoratedName( &name );
+        std::unique_ptr<OLECHAR, decltype(&SysFreeString)> nameGuard( name, &SysFreeString );
 
         if (name && rva)
         {
@@ -160,7 +162,7 @@ HRESULT PDBHelper::PopulateSymbols()
             _cache.emplace( std::move( wname ), rva );
         }
 
-        symbol.Release();
+        symbol.Reset();
     }
 
     return S_OK;

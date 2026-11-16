@@ -13,7 +13,7 @@
 #pragma warning(push)
 #pragma warning(disable : 4091)
 #include "cor.h"
-#include <atlbase.h>
+#include <wrl/client.h>
 #pragma warning(pop)
 
 namespace blackbone
@@ -56,9 +56,9 @@ private:
     mapMethodRVA _methods;      // Image methods
 
     // COM helpers
-    CComPtr<IMetaDataDispenserEx>    _pMetaDisp;
-    CComPtr<IMetaDataImport>         _pMetaImport;
-    CComPtr<IMetaDataAssemblyImport> _pAssemblyImport;
+    Microsoft::WRL::ComPtr<IMetaDataDispenserEx>    _pMetaDisp;
+    Microsoft::WRL::ComPtr<IMetaDataImport>         _pMetaImport;
+    Microsoft::WRL::ComPtr<IMetaDataAssemblyImport> _pAssemblyImport;
 };
 
 }

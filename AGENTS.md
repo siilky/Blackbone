@@ -6,25 +6,25 @@
 - `src/BlackBoneDrv/` contains the C kernel driver and its separate solution.
 - `src/BlackBoneTest/` contains native C++ tests; `Testing/` supplies prebuilt helper executables and DLLs.
 - `src/Samples/` demonstrates library usage. `src/PythonicBlackBone/` contains a ctypes-based Python wrapper and a manual memory-access example.
-- `src/3rd_party/` holds bundled dependencies. `.github/workflows/` defines library/test and driver builds. Generated library outputs belong under `build/`.
+- `src/3rd_party/` holds bundled dependencies. `.github/workflows/` defines library/test and driver builds. `scripts/` holds build tooling. Generated library outputs belong under `build/`.
 
 ## Build, Test, and Development Commands
 
-Use a Visual Studio developer shell with MSBuild and VSTest available. Current non-XP projects select the v142 toolset; install the Windows SDK, Spectre libraries, and ATL components listed in `README.md`. Driver builds additionally require the WDK.
+The library, samples, and native tests build with CMake; the driver keeps its MSBuild solution. Install the components listed in [Requirements](README.md#requirements). Driver builds additionally require the WDK.
 
-Run from the repository root:
+Run from the repository root in PowerShell 7:
 
 ```powershell
-MSBuild.exe BlackBone.sln /p:CI=true /p:Platform=x64 /p:Configuration=Release
-vstest.console.exe "build/x64/Release/BlackBoneTest.dll"
+./scripts/build.ps1 -Test
+./scripts/build.ps1 -Arch x64,x86 -Preset static-mt,static-md,dll -Test
 MSBuild.exe src/BlackBoneDrv/BlackBoneDrv.sln /p:Platform=x64 /p:Configuration=Win10Release
 ```
 
-These build the library solution, run native tests, and build the driver separately. Library CI covers Win32 and x64 with `Release` and `Release(DLL)`; repeat relevant combinations. Launch `build/x64/Release/Samples.exe` for the C++ examples after reviewing their process operations. CMake files under `src/` cover the library and samples, not the native test suite.
+The script builds `Release` and runs the native tests with the driver-dependent tests ignored; its help (`Get-Help ./scripts/build.ps1 -Detailed`) owns the parameters. On a test-host crash, `/Blame` records the running test under `build/<arch>-<preset>/TestResults/`. MSBuild for the driver needs the developer shell activated as in [Build and test](docs/agents/workflow.md#build-and-test). [Building](README.md#building) owns the presets and options. Library CI runs the script for x86 and x64 with every preset; repeat relevant combinations. Launch `build/x64-static-mt/Release/Samples.exe` for the C++ examples after reviewing their process operations.
 
 ## Code Navigation
 
-Serena's C++ server reads `compile_commands.json` at the repository root, which Git ignores. It comes from the CMake files under `src/`, so it covers the library and samples; `src/BlackBoneTest/` is absent, and symbol references miss test call sites; search the tests with Grep. Those CMake files list sources by hand, so a source file added only to a `.vcxproj` is missing from the database. After adding or removing a source file, regenerate the database in a developer shell (see [Build and test](docs/agents/workflow.md#build-and-test)):
+Serena's C++ server reads `compile_commands.json` at the repository root, which Git ignores. It comes from the CMake files under `src/` and covers the library, samples, and tests. Those CMake files list sources by hand: add a new source file to its `CMakeLists.txt`, then regenerate the database in a developer shell (see [Build and test](docs/agents/workflow.md#build-and-test)):
 
 ```powershell
 cmake -G Ninja -S src -B build/compdb -DCMAKE_EXPORT_COMPILE_COMMANDS=ON

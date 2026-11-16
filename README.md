@@ -85,11 +85,39 @@
 
 ## Requirements
 
-- Visual Studio 2017 15.7 or higher
+- Visual Studio 2017 15.7 or higher with the C++ desktop workload, including the C++ unit test framework (`VC/Auxiliary/VS/UnitTest`), which the native tests build against
+- CMake 3.21 or higher and Ninja
 - Windows SDK 10.0.17134 or higher
 - WDK 10.0.17134 or higher (driver only)
-- VC++ 2017 Libs for Spectre (x86 and x64)
-- Visual C++ ATL (x86/x64) with Spectre Mitigations
+
+## Building
+
+The library, samples, and tests build with CMake from a Visual Studio developer shell; its target architecture (x64 or x86) selects the build. From the repository root:
+
+```
+cmake -S src --preset static-mt
+cmake --build build/x64-static-mt --config Release
+```
+
+`scripts/build.ps1` (PowerShell 7) wraps these steps: it activates the developer shell, builds one or more architectures and presets, and with `-Test` runs the native tests. For example, `./scripts/build.ps1 -Arch x64,x86 -Preset static-mt,static-md,dll -Test` builds and tests every combination. Run it from a shell without an active developer environment to build several architectures; `Get-Help ./scripts/build.ps1 -Detailed` lists its parameters.
+
+Presets choose the library linkage and the C runtime; tests and samples use the same settings as the library:
+
+| Preset | Library | CRT |
+|---|---|---|
+| `static-mt` | static | static (`/MT`, `/MTd`) |
+| `static-md` | static | DLL (`/MD`, `/MDd`) |
+| `dll` | DLL | DLL (`/MD`, `/MDd`) |
+
+Outputs go to `build/<arch>-<preset>/<config>/`. The same choice is available without presets through `BUILD_SHARED_LIBS` and `CMAKE_MSVC_RUNTIME_LIBRARY`; the tests find the `Testing/` helpers only when the build tree is a direct subdirectory of `build/`. A DLL with the static CRT is rejected, because the library API passes STL objects between modules.
+
+Options:
+
+- `BLACKBONE_TRACE`: `OFF`, `FILE`, or `CONSOLE` (console and file). Empty, the default, selects `CONSOLE` in Debug and `OFF` otherwise.
+- `BLACKBONE_XP_BUILD`: Windows XP support; requires an XP-capable toolset, such as `v141_xp` selected with `-T` under a Visual Studio generator.
+- `BLACKBONE_TEST_SKIP_DRIVER`: mark the tests that need the BlackBone driver as ignored.
+
+The driver builds separately with `src/BlackBoneDrv/BlackBoneDrv.sln`.
 
 ## License
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.

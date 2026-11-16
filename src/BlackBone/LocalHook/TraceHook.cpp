@@ -1,12 +1,7 @@
 #include "../Config.h"
 #include "TraceHook.h"
 #include "../Include/Macro.h"
-
-#define BEA_USE_STDCALL
-#if defined(BLACKBONE_STATIC)
-	#define BEA_ENGINE_STATIC
-#endif
-#include <3rd_party/BeaEngine/headers/BeaEngine.h>
+#include "../Asm/LDasm.h"
 
 #include <algorithm>
 
@@ -23,6 +18,24 @@
 
 namespace blackbone
 {
+
+/// <summary>
+/// Check if instruction at the address is a 'call'
+/// </summary>
+/// <param name="ip">Instruction address</param>
+/// <returns>true if 'call'</returns>
+static bool IsCall( uintptr_t ip )
+{
+    ldasm_data ld = { 0 };
+    const auto code = reinterpret_cast<uint8_t*>(ip);
+    if (ldasm( code, &ld, is_x64 ) == 0 || ld.flags & F_INVALID || ld.opcd_size != 1)
+        return false;
+
+    // E8 - call rel, FF /2 and FF /3 - indirect near and far call, 9A - direct far call (invalid in x64)
+    const uint8_t op = code[ld.opcd_offset];
+    const uint8_t reg = (ld.modrm >> 3) & 7;
+    return op == 0xE8 || (op == 0xFF && (reg == 2 || reg == 3)) || (op == 0x9A && !is_x64);
+}
 
 TraceHook::TraceHook()
 {
@@ -293,24 +306,8 @@ bool TraceHook::CheckBranching( const HookContext& ctx, uintptr_t ip, uintptr_t 
 
     // Difference in instruction pointer more than possible 'call' length
     // Stack pointer changed
-    if (ip - ctx.lastIP >= 8 && sp != ctx.lastSP)
-    {
-        DISASM info = { 0 };
-        info.EIP = ctx.lastIP;
-
-    #ifdef USE64
-        info.Archi = 64;
-    #endif  
-
-        // FIXME: Alternateve for MinGW
-#ifdef COMPILER_MSVC
-        // Double-check call instruction using disasm
-        if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
-            return true;
-#endif //COMPILER_MSVC
-    }
-
-    return false;
+    // Double-check call instruction
+    return ip - ctx.lastIP >= 8 && sp != ctx.lastSP && IsCall( ctx.lastIP );
 }
 
 /// <summary>
@@ -435,21 +432,11 @@ size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& re
         // Detect 'call' instruction
         for (uintptr_t j = 1; j < 8; j++)
         {
-            DISASM info = { 0 };
-            info.EIP = original - j;
-
-        #ifdef USE64
-            info.Archi = 64;
-        #endif  
-
-            // FIXME: Alternative for MinGW
-#ifdef COMPILER_MSVC
-            if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
+            if (IsCall( original - j ))
             {
                 results.emplace_back( stackPtr, stack_val );
                 break;
             }
-#endif // COMPILER_MSVC
         }
 
     }
