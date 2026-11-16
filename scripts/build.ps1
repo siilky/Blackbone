@@ -24,7 +24,9 @@ param(
     # vstest.console.exe /TestCaseFilter expression, e.g. 'Name!=CallLoop'
     [string] $TestFilter,
     # Run the tests that need the BlackBone driver loaded; they are ignored otherwise
-    [switch] $DriverTests
+    [switch] $DriverTests,
+    # Build Release without whole-program optimization (/GL, /LTCG)
+    [switch] $NoLtcg
 )
 
 # A developer shell fixes the target architecture of its process: activating another one in
@@ -44,6 +46,7 @@ if ($Arch.Count -gt 1 -or $Preset.Count -gt 1) {
             if ($Test) { $childArgs += '-Test' }
             if ($TestFilter) { $childArgs += '-TestFilter', $TestFilter }
             if ($DriverTests) { $childArgs += '-DriverTests' }
+            if ($NoLtcg) { $childArgs += '-NoLtcg' }
 
             & pwsh @childArgs
             if ($LASTEXITCODE) { $failed += "$a-$p" }
@@ -74,8 +77,10 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot
 $buildDir = "$root/build/$Arch-$Preset"
 $skipDriver = if ($DriverTests) { 'OFF' } else { 'ON' }
+$ltcg = if ($NoLtcg) { 'OFF' } else { 'ON' }
 
-cmake -S "$root/src" --preset $Preset "-DBLACKBONE_TEST_SKIP_DRIVER=$skipDriver"
+# Both values are passed every time: they are cached, so an omitted switch would keep the previous run's value.
+cmake -S "$root/src" --preset $Preset "-DBLACKBONE_TEST_SKIP_DRIVER=$skipDriver" "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=$ltcg"
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 cmake --build $buildDir --config $Config

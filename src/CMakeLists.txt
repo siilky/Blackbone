@@ -11,7 +11,13 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_definitions(UNICODE _UNICODE)
-add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/W3>)
+add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/W3> $<$<COMPILE_LANGUAGE:C,CXX>:/sdl>)
+
+# Whole-program optimization (/GL, /LTCG) in Release; a static library built this way links
+# only with the same MSVC version, so consumers on another toolset turn it off.
+if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
 
 # One directory per configuration for all binaries: tests load BlackBone.dll and msdia140.dll
 # from their own directory, and Common.h finds Testing/ three directories above it,

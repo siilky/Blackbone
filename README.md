@@ -111,6 +111,8 @@ Presets choose the library linkage and the C runtime; tests and samples use the 
 
 Outputs go to `build/<arch>-<preset>/<config>/`. The same choice is available without presets through `BUILD_SHARED_LIBS` and `CMAKE_MSVC_RUNTIME_LIBRARY`; the tests find the `Testing/` helpers only when the build tree is a direct subdirectory of `build/`. A DLL with the static CRT is rejected, because the library API passes STL objects between modules.
 
+All targets compile with `/sdl`. Release uses whole-program optimization (`/GL`, `/LTCG`); a static library built with it links only with the same MSVC version, so a consumer on another toolset configures with `-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF` (`scripts/build.ps1 -NoLtcg`).
+
 Options:
 
 - `BLACKBONE_TRACE`: `OFF`, `FILE`, or `CONSOLE` (console and file). Empty, the default, selects `CONSOLE` in Debug and `OFF` otherwise.
