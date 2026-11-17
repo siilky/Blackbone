@@ -21,17 +21,21 @@ public:
     InitOnce( InitOnce&& ) = delete;
     InitOnce& operator=( InitOnce&& ) = delete;
 
-    static bool Exec()
+    static bool Exec( InitOptions options )
     {
         // Magic static: concurrent callers block until the first one finishes, so no thread
         // sees a partially filled import table. The body must not reenter InitializeOnce,
         // directly or through DynImport::get, or the initializing thread waits on itself.
-        static const bool done = []
+        static const bool done = [options]
         {
             InitVersion();
 
-            GrantPriviledge( L"SeDebugPrivilege" );
-            GrantPriviledge( L"SeLoadDriverPrivilege" );
+            if (options & AcquirePriveleges)
+            {
+                GrantPriviledge( L"SeDebugPrivilege" );
+                GrantPriviledge( L"SeLoadDriverPrivilege" );
+            }
+
             LoadFuncs();
             return true;
         }();
@@ -118,9 +122,10 @@ public:
 /// <summary>
 /// Exported InitOnce wrapper
 /// </summary>
+/// <param name="options">Initialization options, effective only on the first call</param>
 /// <returns>true on initialization completion</returns>
-bool InitializeOnce()
+bool InitializeOnce( InitOptions options )
 {
-    return InitOnce::Exec();
+    return InitOnce::Exec( options );
 }
 }
