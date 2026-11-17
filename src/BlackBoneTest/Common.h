@@ -40,7 +40,13 @@ public:
 
     static void NtSuccess( NTSTATUS status, const wchar_t* message = nullptr, const __LineInfo* pLineInfo = nullptr )
     {
-        AssertEx::IsTrue( status >= 0, message, pLineInfo );
+        wchar_t statusText[32];
+        swprintf_s( statusText, L"NTSTATUS: 0x%08X", static_cast<unsigned>(status) );
+        std::wstring diagnostic = statusText;
+        if (message)
+            diagnostic += std::wstring( L": " ) + message;
+
+        AssertEx::IsTrue( status >= 0, diagnostic.c_str(), pLineInfo );
     }
 };
 

@@ -4,6 +4,13 @@ namespace Testing
 {
     struct HookClass
     {
+        ~HookClass()
+        {
+            // Join the debug thread before callback state is destroyed, including on assertion failure.
+            process.hooks().reset();
+            process.Terminate();
+        }
+
         void HookNtOpenProcess( RemoteContext& context )
         {
             //
@@ -28,18 +35,15 @@ namespace Testing
 
         void HookNtAllocateVirtualMemory( RemoteContext& context )
         {
-            AssertEx::AreEqual( reinterpret_cast<HANDLE>(context.getArg( 0 )), GetCurrentProcess() );
-            AssertEx::AreNotEqual( context.getArg( 1 ), DWORD64( 0 ) );
-            AssertEx::AreEqual( context.getArg( 2 ), DWORD64( 0 ) );
-            AssertEx::AreNotEqual( context.getArg( 3 ), DWORD64( 0 ) );
-            AssertEx::AreEqual( context.getArg( 4 ), DWORD64( MEM_RESERVE | MEM_COMMIT ) );
-            AssertEx::AreEqual( context.getArg( 5 ), DWORD64( PAGE_EXECUTE_READWRITE ) );
+            for (int i = 0; i < 6; i++)
+                arguments[i] = context.getArg( i );
 
             calls++;
         }
 
         Process process;
         int calls = 0;
+        DWORD64 arguments[6] = { };
     };
 
     TEST_CLASS( RemoteHooking )
@@ -71,7 +75,8 @@ namespace Testing
             auto terminate = MakeRemoteFunction<long( *)(DWORD)>( hooker.process, terminatePtr->procAddress );
             auto result = terminate( GetCurrentProcessId() );
 
-            hooker.process.Terminate();
+            // Remove waits for any callback holding the hook lock before captured state is read.
+            hooker.process.hooks().Remove( pHookFn->procAddress );
 
             AssertEx::IsTrue( result.success() );
             AssertEx::AreEqual( ERROR_ACCESS_DENIED, result.result() );
@@ -97,13 +102,32 @@ namespace Testing
             SIZE_T size = 0xDEAD;
             auto NtAllocateVirtualMemory = MakeRemoteFunction<NTSTATUS( __stdcall * )(HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG)>( hooker.process, pHookFn->procAddress );
 
+            AssertEx::NtSuccess( hooker.process.remote().CreateRPCEnvironment( Worker_CreateNew, true ) );
+            auto worker = hooker.process.remote().getWorker();
+            AssertEx::IsTrue( worker != nullptr );
+
             // Hook and try to call
-            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn->procAddress, &HookClass::HookNtAllocateVirtualMemory, hooker ) );
-            auto result = NtAllocateVirtualMemory.Call( { GetCurrentProcess(), &base, 0, &size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE } );
+            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn->procAddress, &HookClass::HookNtAllocateVirtualMemory, hooker, worker ) );
+            auto backgroundResult = NtAllocateVirtualMemory.Call( { GetCurrentProcess(), &base, 0, &size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE } );
 
-            hooker.process.Terminate();
+            base = nullptr;
+            size = 0xDEAD;
+            auto result = NtAllocateVirtualMemory.Call( { GetCurrentProcess(), &base, 0, &size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE }, worker );
 
+            // Remove waits for any callback holding the hook lock before captured state is read.
+            hooker.process.hooks().Remove( pHookFn->procAddress );
+
+            AssertEx::NtSuccess( backgroundResult.status );
+            AssertEx::NtSuccess( backgroundResult.result() );
+            AssertEx::NtSuccess( result.status );
+            AssertEx::NtSuccess( result.result() );
             AssertEx::AreEqual( 1, hooker.calls );
+            AssertEx::AreEqual( reinterpret_cast<HANDLE>(hooker.arguments[0]), GetCurrentProcess() );
+            AssertEx::AreNotEqual( hooker.arguments[1], DWORD64( 0 ) );
+            AssertEx::AreEqual( hooker.arguments[2], DWORD64( 0 ) );
+            AssertEx::AreNotEqual( hooker.arguments[3], DWORD64( 0 ) );
+            AssertEx::AreEqual( hooker.arguments[4], DWORD64( MEM_RESERVE | MEM_COMMIT ) );
+            AssertEx::AreEqual( hooker.arguments[5], DWORD64( PAGE_EXECUTE_READWRITE ) );
         }
     };
 }

@@ -40,6 +40,68 @@ namespace Testing
             AssertEx::AreNotEqual( name.npos, name.rfind( Utils::ToLower( ModuleName ) ) );
         }
 
+#ifdef USE32
+        TEST_METHOD( StructCallPreservesNonvolatileRegisters )
+        {
+            struct Payload
+            {
+                uint32_t first;
+                uint32_t second;
+                uint32_t third;
+            };
+
+            Payload payload = { 0x12345678, 0x9ABCDEF0, 0x13579BDF };
+            Payload received = { };
+            uint64_t returnValue = 0;
+            uint64_t( __cdecl* callback )(Payload, Payload*) = []( Payload value, Payload* output ) -> uint64_t
+            {
+                *output = value;
+                return 0x123456789ABCDEF0ull;
+            };
+
+            auto innerPtr = AsmFactory::GetAssembler();
+            auto& inner = *innerPtr;
+            std::vector<AsmVariant> args = { payload, &received };
+            // Resolve the struct source locally, as RPC does for the target process.
+            args.front().new_imm_val = reinterpret_cast<uintptr_t>(args.front().buf.data());
+
+            inner.GenPrologue();
+            inner.GenCall( reinterpret_cast<uintptr_t>(callback), args, cc_cdecl );
+            inner.GenEpilogue();
+            auto innerCode = inner->make();
+            AssertEx::IsTrue( innerCode != nullptr );
+
+            auto outerPtr = AsmFactory::GetAssembler();
+            auto& outer = *outerPtr;
+            // Preserve the test caller independently of the prologue/epilogue under test.
+            outer->push( asmjit::host::esi );
+            outer->push( asmjit::host::edi );
+            outer->mov( asmjit::host::esi, 0x13572468 );
+            outer->mov( asmjit::host::edi, 0x24681357 );
+            outer.GenCall( innerCode, { } );
+            outer->mov( asmjit::host::ecx, reinterpret_cast<uintptr_t>(&returnValue) );
+            outer->mov( asmjit::host::dword_ptr( asmjit::host::ecx ), asmjit::host::eax );
+            outer->mov( asmjit::host::dword_ptr( asmjit::host::ecx, 4 ), asmjit::host::edx );
+            outer->xor_( asmjit::host::esi, 0x13572468 );
+            outer->xor_( asmjit::host::edi, 0x24681357 );
+            outer->or_( asmjit::host::esi, asmjit::host::edi );
+            outer->mov( asmjit::host::eax, asmjit::host::esi );
+            outer->pop( asmjit::host::edi );
+            outer->pop( asmjit::host::esi );
+            outer->ret();
+
+            auto func = reinterpret_cast<uint32_t(*)()>(outer->make());
+            AssertEx::IsTrue( func != nullptr );
+            auto mismatch = func();
+
+            AssertEx::AreEqual( payload.first, received.first );
+            AssertEx::AreEqual( payload.second, received.second );
+            AssertEx::AreEqual( payload.third, received.third );
+            AssertEx::AreEqual( uint64_t( 0x123456789ABCDEF0ull ), returnValue );
+            AssertEx::IsZero( mismatch, L"Struct marshaling must preserve ESI and EDI" );
+        }
+#endif
+
         TEST_METHOD( MultiCall )
         {
             auto asmPtr = AsmFactory::GetAssembler();

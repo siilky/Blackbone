@@ -29,6 +29,9 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
     {
         _assembler.push( asmjit::host::ebp );
         _assembler.mov( asmjit::host::ebp, asmjit::host::esp );
+        // Struct copies clobber nonvolatile ESI/EDI, including the APC dispatcher's EDI context pointer.
+        _assembler.push( asmjit::host::esi );
+        _assembler.push( asmjit::host::edi );
     }
 }
 
@@ -45,7 +48,9 @@ void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= -1 
     }
     else
     {
-        _assembler.mov( asmjit::host::esp, asmjit::host::ebp );
+        _assembler.lea( asmjit::host::esp, asmjit::host::dword_ptr( asmjit::host::ebp, -8 ) );
+        _assembler.pop( asmjit::host::edi );
+        _assembler.pop( asmjit::host::esi );
         _assembler.pop( asmjit::host::ebp );
     }
 
