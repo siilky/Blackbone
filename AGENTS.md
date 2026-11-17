@@ -24,7 +24,7 @@ The script builds `Release` and runs the native tests with the driver-dependent 
 
 ## Code Navigation
 
-Serena's C++ server reads `compile_commands.json` at the repository root, which Git ignores. It comes from the CMake files under `src/` and covers the library, samples, and tests. Those CMake files list sources by hand: add a new source file to its `CMakeLists.txt`, then regenerate the database in a developer shell (see [Build and test](docs/agents/workflow.md#build-and-test)):
+C++ code-navigation tools that use a compilation database read `compile_commands.json` at the repository root, which Git ignores. It comes from the CMake files under `src/` and covers the library, samples, and tests. Those CMake files list sources by hand: add a new source file to its `CMakeLists.txt`, then regenerate the database in a developer shell (see [Build and test](docs/agents/workflow.md#build-and-test)):
 
 ```powershell
 cmake -G Ninja -S src -B build/compdb -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
@@ -51,14 +51,14 @@ Before creating or changing documentation, and when completing an implementation
 
 ### Agent skill configuration
 
-Before implementation, review, or delegation, read [the workflow configuration](docs/agents/workflow.md).
+Before implementation, review, or delegation, read [the workflow configuration](docs/agents/workflow.md), including its [local environment](docs/agents/workflow.md#local-environment) section. The rules below apply to every skill or workflow that performs the named activity.
 
-- Diagnosis (`diagnosing-bugs`), review (`code-review`), and audits stay read-only; continue to changes only when the user authorizes them.
-- TDD is optional, including for delegated workers; use `tdd` when test-first work is requested or agreed.
-- `to-spec`, `to-tickets`, `triage`, and `wayfinder` run only when the user chooses them; a small change goes straight to implementation.
-- `research` and `prototype` report findings; production integration needs the user's go-ahead.
+- Diagnosis, review, and audits stay read-only; continue to changes only when the user authorizes them.
+- Test-first development is optional, including for delegated workers; use it when it is requested or agreed.
+- Spec writing, ticket breakdown, triage, and wayfinding run only when the user chooses them; a small change goes straight to implementation.
+- Research and prototypes report findings; production integration needs the user's go-ahead.
 - Commit, push, and external publication require a user request, including when a skill's own steps include them.
-- Ponytail governs implementation simplicity: reuse existing boundaries and add no speculative abstractions. This repository's contract clarification, agreed test coverage, review, verification, and reporting rules take precedence over Ponytail's defaults on proceeding without questions, test counts, and response length.
+- Implementation stays simple: reuse existing boundaries and add no speculative abstractions. This repository's contract clarification, agreed test coverage, review, verification, and reporting rules take precedence over any skill's defaults on proceeding without questions, test counts, and response length.
 - After the contract is settled, use [delegated implementation](docs/agents/delegation.md) when bounded task packets can carry the work: two or more independent workstreams with exclusive file ownership, or one sizeable well-specified lane such as bulk tests or a mechanical migration. Small or inseparable changes stay with the root session. An explicit user request also selects it.
 
 ### Issue tracker

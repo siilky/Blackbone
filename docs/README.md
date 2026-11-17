@@ -11,6 +11,7 @@ This document owns where repository knowledge lives and how it stays current. Ea
 | `GLOSSARY.md`, `docs/adr/` | Domain terms and recorded decisions, created when a term or decision is settled ([domain docs](agents/domain.md)) | committed |
 | `docs/TODO.md` | Accepted future work, created with its first entry | committed |
 | `.scratch/` | Specs, tickets, plans, and session handoffs ([issue tracker](agents/issue-tracker.md)) | local, ignored by Git |
+| `docs/agents/environment.md` | One user's agent client, models, code-navigation tools, skills, and shell specifics ([local environment](agents/workflow.md#local-environment)) | local, ignored by Git |
 
 Incident logs, raw command output, transient test counts, and exploratory notes stay in the session or in `.scratch/`.
 

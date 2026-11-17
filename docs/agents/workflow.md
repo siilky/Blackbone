@@ -4,7 +4,7 @@ Read this before implementation, review, or delegation. [Agent skill configurati
 
 ## Build and test
 
-Each PowerShell tool call starts a fresh shell without CMake, Ninja, MSBuild, VSTest, or the compiler on `PATH`. `scripts/build.ps1` activates the Visual Studio developer shell itself; run it as described in [Build, Test, and Development Commands](../../AGENTS.md#build-test-and-development-commands). Any other build, test, or CMake command needs the activation in the same call; use `-Arch x86` for 32-bit builds:
+A fresh shell has no CMake, Ninja, MSBuild, VSTest, or compiler on `PATH`. `scripts/build.ps1` activates the Visual Studio developer shell itself; run it as described in [Build, Test, and Development Commands](../../AGENTS.md#build-test-and-development-commands). Any other build, test, or CMake command needs the activation in the same shell process; use `-Arch x86` for 32-bit builds:
 
 ```powershell
 $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
@@ -19,10 +19,21 @@ Run one build or VSTest process at a time per build directory: a build rewrites 
 
 Pattern scans use private x64 helpers with known bytes, including when the test host is x86; window-search tests create their own hidden window. The default run with driver-dependent tests skipped does not require Explorer, but still requires access to create processes, remote threads, debug events, and windows. If a restricted execution environment changes those operations, repeat the same focused VSTest invocation in a normal user session before classifying a repository failure. Driver-dependent tests remain opt-in through the build script and still require Explorer.
 
+## Local environment
+
+Each user describes their own agent setup in `docs/agents/environment.md`, which Git ignores. Read it when present; without it, use the client's equivalents of the generic operations named in these documents. It covers:
+
+- the agent client and how [delegation](delegation.md#roles) roles map onto it: where role definitions live, how a worker is dispatched with a fresh context, model, and effort, how an existing worker is continued, and which model serves each tier;
+- code-navigation tools and their known blind spots in this repository;
+- installed skills or plugins that perform the activities in [Agent skill configuration](../../AGENTS.md#agent-skill-configuration), and any defaults of theirs that these documents override;
+- shell and tool-harness specifics, such as available shells and whether each command starts a new process.
+
+The file adds client mechanics only; repository rules stay in the committed documents.
+
 ## Workspace
 
 - Work in the current checkout on its current branch. Create a branch or worktree only when the user asks.
-- Write scratch output (redirected command output, probe listings) under a task-named directory in the system temp directory: `$env:TEMP\<task>\` in PowerShell, `$TEMP/<task>/` in Git Bash. Before reporting completion, remove scratch that no report cites.
+- Write scratch output (redirected command output, probe listings) under a task-named directory in the system temp directory (`%TEMP%\<task>\`). Before reporting completion, remove scratch that no report cites.
 - Edit files with the editing tools. A script edits files only for a bulk, uniform migration; state the reason, bound the affected files, and inspect the resulting diff. When a simple edit turns into debugging a script's quoting or matching, finish it with the editing tools.
 - `.gitattributes` normalizes line endings; leave them as the editor writes them.
 
@@ -34,14 +45,14 @@ When a block is committed or handed off, propose continuing the next block in a 
 
 ## Review
 
-Before implementation, record the base revision and the existing working-tree changes. A completion review covers the task's final patch: committed, staged, unstaged, and relevant untracked files. This overrides `code-review`'s comparison of committed changes only. Preserve and exclude unrelated changes. An audit of named files or an area covers the requested scope in full; it needs no base revision.
+Before implementation, record the base revision and the existing working-tree changes. A completion review covers the task's final patch: committed, staged, unstaged, and relevant untracked files. This overrides a review skill's default of comparing committed changes only. Preserve and exclude unrelated changes. An audit of named files or an area covers the requested scope in full; it needs no base revision.
 
-For a small localized change, one compact reviewer covers both Standards and Spec, overriding `code-review`'s two-agent default; dispatch the `reviewer` agent. For a large or cross-cutting change, ask the user which review they want and state each option's agent count. Every review prompt states whether nested review skills and subagents are allowed.
+For a small localized change, one compact reviewer covers both Standards and Spec, overriding a review skill's default of separate agents; dispatch the `reviewer` role. For a large or cross-cutting change, ask the user which review they want and state each option's agent count. Every review prompt states whether nested review skills and subagents are allowed.
 
 Every review, by any reviewer, applies this checklist:
 
 - Both architectures of every touched path: `USE64` / `USE32` branches, `ptr_t` versus 32-bit types where a remote address crosses process bitness, structure layouts read from a target of the other bitness, and WOW64 handling.
-- Consumers in `src/BlackBoneTest/`, found with Grep, because Serena's references miss them.
+- Consumers in `src/BlackBoneTest/`, found with a text search rather than symbol references alone.
 - Test binaries run through `vstest.console.exe` after the developer-shell activation in [Build and test](#build-and-test).
 
 Sort each accepted finding:

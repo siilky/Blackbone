@@ -4,26 +4,28 @@ The root session keeps ambiguity, contracts, test-case selection, scheduling, re
 
 ## Roles
 
-| Role | Owns | Claude Code dispatch |
+| Role | Owns | Model and effort |
 |---|---|---|
 | root | contracts, test cases, packets, integration, review adjudication, commits | this session |
-| implementer | code and test bodies inside one packet | `subagent_type: "implementer"` |
-| implementer, hard lane | the same for remote execution, thread hijacking, manual mapping, WOW64 barrier, syscall, and hook internals | `"implementer"` with `model: "opus"`, `effort: "high"` |
-| scout | read-only discovery | `"Explore"` with `model: "sonnet"` |
-| reviewer | one compact review of the integrated patch | `"reviewer"` |
-| verifier | acceptance checks on the frozen final state | `"verifier"` |
+| implementer | code and test bodies inside one packet | standard tier, high effort |
+| implementer, hard lane | the same for remote execution, thread hijacking, manual mapping, WOW64 barrier, syscall, and hook internals | strongest tier, high effort |
+| scout | read-only discovery | by block weight below |
+| reviewer | one compact review of the integrated patch | by block weight below |
+| verifier | acceptance checks on the frozen final state | standard tier, medium effort |
 
-Role defaults live in the user-level `~/.claude/agents/<role>.md`, which a project-level `.claude/agents/<role>.md` of the same name overrides; they suit an ordinary block, and this repository's specifics reach the workers through [the workflow](workflow.md). A dispatch that overrides `model` keeps the definition's `effort` unless it passes `effort` too. Workers dispatch no agents and leave changes uncommitted.
+Workers dispatch no agents and leave changes uncommitted. Role definitions carry an ordinary block's defaults; this repository's specifics reach the workers through [the workflow](workflow.md). [The local environment](workflow.md#local-environment) maps the roles, tiers, and operations below onto the client.
 
-- Dispatch every worker by its role's `subagent_type`. A `fork` inherits the root's context and model, which defeats both the fresh context and the routing.
-- Continue a worker with `SendMessage` to its agent ID; a new `Agent` call starts cold.
-- Pass `model` and `effort` on every reviewer and scout dispatch, sized by the block:
+- Start every worker with a fresh context under its role's definition and the model and effort from these tables. A forked context inherits the root's context and model, which defeats both the fresh context and the routing. When the client cannot load a role definition by name, include the definition's instructions in the packet.
+- Continue a worker through the client's continuation operation on its existing agent; a new dispatch starts cold.
+- A role's no-edit and no-subagent rules are enforced only when the client restricts the worker's tools; otherwise they are instructions, so do not claim that a reviewer or verifier ran in a read-only sandbox.
 
-| Block weight | Examples | model | effort |
+Pass model and effort on every reviewer and scout dispatch, sized by the block:
+
+| Block weight | Examples | Model | Effort |
 |---|---|---|---|
-| Hard | the hard-lane areas above, cross-process memory layout, concurrency | `opus` | `high` |
-| Ordinary | a localized fix with tests | `sonnet` | `medium` |
-| Light | docs, a test-only or wording change, a file search | `sonnet` | `low` |
+| Hard | the hard-lane areas above, cross-process memory layout, concurrency | strongest tier | high |
+| Ordinary | a localized fix with tests | standard tier | medium |
+| Light | docs, a test-only or wording change, a file search | standard tier | low |
 
 Without subagent support, run the same stages sequentially and disclose the missing independent verification.
 
@@ -34,13 +36,13 @@ Delegation trades the root's tokens for packet precision; a weaker model degrade
 - **Packet test.** If a packet cannot be written without solving the task, the root implements it instead.
 - The packet pins signatures, ownership, invariants, and a reference pattern in existing code ("follow `RemoteExec::ExecInAnyThread`"). The root chooses test cases, boundaries, and inverse cases; the implementer writes their bodies.
 - Split work along real ownership boundaries; create no abstractions or files just to occupy workers.
-- Review findings return to the implementer that wrote the code through `SendMessage`. When that context is gone, a new implementer receives the findings together with the prior diff.
+- Review findings return to the implementer that wrote the code through the client's continuation operation above. When that context is gone, a new implementer receives the findings together with the prior diff.
 
 ## Prepare and dispatch
 
 1. Settle the requested outcome, existing invariants, acceptance checks, and every unresolved contract decision before any writer starts.
 2. For a large unfamiliar batch, dispatch scouts on the open architecture or verification questions.
-3. Find every consumer of each contract the batch changes: library callers, tests, samples, and the ctypes signatures in `src/PythonicBlackBone/`. Serena's references miss `src/BlackBoneTest/`; search the tests with Grep. Assign each consumer to an owned path or record why it stays unchanged.
+3. Find every consumer of each contract the batch changes: library callers, tests, samples, and the ctypes signatures in `src/PythonicBlackBone/`. Search `src/BlackBoneTest/` by text as well, because symbol-reference search can miss test consumers. Assign each consumer to an owned path or record why it stays unchanged.
 4. Record dependencies and exclusive file ownership in a compact table. Launch only ready, independent tasks.
 5. All workers share the root's checkout, because the integrated base usually includes uncommitted changes. Each writer edits only its owned files; overlapping work is serialized with an explicit ownership transfer. Builds and tests run one at a time under [Build and test](workflow.md#build-and-test); a worker whose build fails on another lane's files reports the failure.
 

@@ -87,3 +87,4 @@ GeneratedFiles*/
 *.json
 !/src/CMakePresets.json
 .scratch/
+/docs/agents/environment.md
