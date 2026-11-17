@@ -6,10 +6,6 @@
 #include "../Include/HandleGuard.h"
 #include "../Misc/Utils.h"
 
-#ifdef COMPILER_MSVC
-#include "ImageNET.h"
-#endif // COMPILER_MSVC
-
 #include <string>
 #include <memory>
 #include <vector>
@@ -287,14 +283,6 @@ public:
     /// <returns>DllCharacteristics</returns>
     BLACKBONE_API inline uint32_t DllCharacteristics() const { return _DllCharacteristics; }
 
-#ifdef COMPILER_MSVC
-    /// <summary>
-    /// .NET image parser
-    /// </summary>
-    /// <returns>.NET image parser</returns>
-    BLACKBONE_API ImageNET& net() { return _netImage; }
-#endif
-
 private:
     /// <summary>
     /// Prepare activation context
@@ -338,10 +326,6 @@ private:
 
     std::wstring _imagePath;                    // Image path
     std::wstring _manifestPath;                 // Image manifest container
-
-#ifdef COMPILER_MSVC
-    ImageNET    _netImage;                      // .net image info
-#endif
 };
 
 }

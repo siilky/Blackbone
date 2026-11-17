@@ -21,7 +21,6 @@ add_library(BlackBone
     ../3rd_party/AsmJit/x86/x86inst.cpp
     ../3rd_party/AsmJit/x86/x86operand.cpp
     ../3rd_party/AsmJit/x86/x86operand_regs.cpp
-    ../3rd_party/rewolf-wow64ext/src/wow64ext.cpp
     Asm/AsmHelper32.cpp
     Asm/AsmHelper64.cpp
     Asm/LDasm.c
@@ -49,22 +48,26 @@ add_library(BlackBone
     Process/Threads/Thread.cpp
     Process/Threads/Threads.cpp
     Subsystem/NativeSubsystem.cpp
-    Subsystem/Wow64Subsystem.cpp
-    Subsystem/x86Subsystem.cpp
     Symbols/PatternLoader.cpp
     Symbols/PDBHelper.cpp
     Symbols/SymbolData.cpp
     Symbols/SymbolLoader.cpp)
 
 target_include_directories(BlackBone PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_compile_options(BlackBone PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:/wd4100 /wd4996>)
+# /Gw puts each global variable in its own COMDAT, so /OPT:REF drops data that no linked code
+# references, such as the AsmJit instruction tables in a consumer that never assembles code.
+target_compile_options(BlackBone PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:/wd4100 /wd4996 /Gw>)
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     target_sources(BlackBone PRIVATE Syscalls/Syscall64.asm)
     target_link_libraries(BlackBone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/DIA/lib/amd64/diaguids.lib)
     set(DIA_RUNTIME_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../DIA/x64)
 else()
-    target_sources(BlackBone PRIVATE Syscalls/Syscall32.asm)
+    target_sources(BlackBone PRIVATE
+        ../3rd_party/rewolf-wow64ext/src/wow64ext.cpp
+        Subsystem/Wow64Subsystem.cpp
+        Subsystem/x86Subsystem.cpp
+        Syscalls/Syscall32.asm)
     target_compile_options(BlackBone PRIVATE $<$<COMPILE_LANGUAGE:ASM_MASM>:/safeseh>)
     target_link_libraries(BlackBone PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/DIA/lib/diaguids.lib)
     set(DIA_RUNTIME_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../DIA/Win32)

@@ -4,6 +4,11 @@
 #include "../Include/Macro.h"
 #include <3rd_party/VersionApi.h>
 
+#ifdef USE32
+#include "../Subsystem/Wow64Subsystem.h"
+#include "../Subsystem/x86Subsystem.h"
+#endif
+
 namespace blackbone
 {
 
@@ -70,6 +75,10 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
 /// <returns>Status code</returns>
 NTSTATUS ProcessCore::Init()
 {
+#ifdef USE64
+    // An x64 build never runs on an x86 OS and is never WOW64, so no runtime choice is needed
+    _native = std::make_unique<Native>( _hProcess );
+#else
     // Detect x86 OS
     SYSTEM_INFO info = { { 0 } };
     GetNativeSystemInfo( &info );
@@ -89,6 +98,7 @@ NTSTATUS ProcessCore::Init()
         else
             _native = std::make_unique<Native>( _hProcess );
     }
+#endif
 
     // Get DEP info
     // For native x64 processes DEP is always enabled

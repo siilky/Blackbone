@@ -28,7 +28,7 @@ class Native
 {
 public:
     BLACKBONE_API Native( HANDLE hProcess, bool x86OS = false );
-    BLACKBONE_API ~Native();
+    BLACKBONE_API virtual ~Native();
 
     BLACKBONE_API inline const Wow64Barrier& GetWow64Barrier() const { return _wowBarrier; }
 

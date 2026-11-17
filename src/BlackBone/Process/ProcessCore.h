@@ -2,8 +2,7 @@
 
 #include "../Include/NativeStructures.h"
 #include "../Include/HandleGuard.h"
-#include "../Subsystem/Wow64Subsystem.h"
-#include "../Subsystem/x86Subsystem.h"
+#include "../Subsystem/NativeSubsystem.h"
 
 #include <memory>
 #include <stdint.h>
