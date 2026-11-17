@@ -29,6 +29,12 @@ namespace Testing
             modList.emplace( L"shlwapi.dll" );
         }
 
+        TEST_METHOD_CLEANUP( Cleanup )
+        {
+            _proc.Terminate();
+            _proc.Detach();
+        }
+
         static LoadData MapCallback( CallbackType type, void* /*context*/, Process& /*process*/, const ModuleData& modInfo )
         {
             if (type == PreCallback)
@@ -68,23 +74,22 @@ namespace Testing
     private:
         void MapFromFile( const std::wstring& hostPath, const std::wstring& dllPath )
         {
-            Process proc;
-            NTSTATUS status = proc.CreateAndAttach( hostPath );
+            Process& proc = _proc;
+            // Initialize through a separate thread while the main thread stays suspended.
+            NTSTATUS status = proc.CreateAndAttach( hostPath, true, false );
             AssertEx::NtSuccess( status );
-            proc.EnsureInit();
+            AssertEx::NtSuccess( proc.EnsureInit() );
 
             auto image = proc.mmap().MapImage( dllPath, ManualImports, &MapCallback );
-            AssertEx::IsTrue( image.success() );
-            AssertEx::IsNotNull( image.result().get() );
+            AssertEx::NtSuccess( image.status );
+            AssertEx::IsNotNull( image.result().get(), L"Mapped image" );
 
             auto g_loadDataPtr = proc.modules().GetExport( image.result(), "g_LoadData" );
-            AssertEx::IsTrue( g_loadDataPtr.success() );
-            AssertEx::IsNotZero( g_loadDataPtr->procAddress );
+            AssertEx::NtSuccess( g_loadDataPtr.status );
+            AssertEx::IsNotZero( g_loadDataPtr->procAddress, L"g_LoadData export" );
 
             auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr->procAddress );
-            AssertEx::IsTrue( g_loadData.success() );
-
-            proc.Terminate();
+            AssertEx::NtSuccess( g_loadData.status );
 
             ValidateDllLoad( g_loadData.result() );
         }
@@ -94,39 +99,37 @@ namespace Testing
             auto[buf, size] = GetFileData( dllPath );
             AssertEx::IsNotZero( size );
 
-            Process proc;
-            NTSTATUS status = proc.CreateAndAttach( hostPath );
+            Process& proc = _proc;
+            NTSTATUS status = proc.CreateAndAttach( hostPath, true, false );
             AssertEx::NtSuccess( status );
-            proc.EnsureInit();
+            AssertEx::NtSuccess( proc.EnsureInit() );
 
             auto image = proc.mmap().MapImage( size, buf.get(), false, ManualImports, &MapCallback );
-            AssertEx::IsTrue( image.success() );
-            AssertEx::IsNotNull( image.result().get() );
+            AssertEx::NtSuccess( image.status );
+            AssertEx::IsNotNull( image.result().get(), L"Mapped image" );
 
             auto g_loadDataPtr = proc.modules().GetExport( image.result(), "g_LoadData" );
-            AssertEx::IsTrue( g_loadDataPtr.success() );
-            AssertEx::IsNotZero( g_loadDataPtr->procAddress );
+            AssertEx::NtSuccess( g_loadDataPtr.status );
+            AssertEx::IsNotZero( g_loadDataPtr->procAddress, L"g_LoadData export" );
 
             auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr->procAddress );
-            AssertEx::IsTrue( g_loadData.success() );
-
-            proc.Terminate();
+            AssertEx::NtSuccess( g_loadData.status );
 
             ValidateDllLoad( g_loadData.result() );
         }
 
         void ValidateDllLoad( const DllLoadData& data )
         {
-            AssertEx::IsTrue( data.initialized );
-            AssertEx::IsFalse( data.deinitialized );
-            AssertEx::IsTrue( data.static_initialized );
-            AssertEx::IsTrue( data.static_thread_initialized );
-            AssertEx::IsTrue( data.static_func_initialized );
-            AssertEx::IsFalse( data.seh_internal );
-            AssertEx::IsTrue( data.seh_external );
-            AssertEx::IsFalse( data.ceh_internal );
-            AssertEx::IsTrue( data.ceh_external );
-            AssertEx::IsFalse( data.ceh_uncaught );
+            AssertEx::IsTrue( data.initialized, L"initialized" );
+            AssertEx::IsFalse( data.deinitialized, L"deinitialized" );
+            AssertEx::IsTrue( data.static_initialized, L"static_initialized" );
+            AssertEx::IsTrue( data.static_thread_initialized, L"static_thread_initialized" );
+            AssertEx::IsTrue( data.static_func_initialized, L"static_func_initialized" );
+            AssertEx::IsFalse( data.seh_internal, L"seh_internal" );
+            AssertEx::IsTrue( data.seh_external, L"seh_external" );
+            AssertEx::IsFalse( data.ceh_internal, L"ceh_internal" );
+            AssertEx::IsTrue( data.ceh_external, L"ceh_external" );
+            AssertEx::IsFalse( data.ceh_uncaught, L"ceh_uncaught" );
         }
 
         std::pair<std::unique_ptr<uint8_t[]>, uint32_t> GetFileData( const std::wstring& path )
@@ -146,6 +149,7 @@ namespace Testing
         }
 
     private:
+        Process _proc;
         static inline std::set<std::wstring> nativeMods, modList;
     };
 }

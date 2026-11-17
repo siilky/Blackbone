@@ -284,9 +284,31 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         if (!pDecode)
             return pDecode.status;
 
+        auto pProtect = static_cast<uint32_t>(g_symbols.LdrProtectMrdata);
+        if (pProtect != 0)
+        {
+            auto adapter = AsmFactory::GetAssembler( AsmFactory::asm32 );
+            adapter->GenPrologue();
+            // Support both stdcall and fastcall LdrProtectMrdata; the frame reset discards an unused stack argument.
+            (*adapter)->mov( asmjit::host::ecx, asmjit::host::dword_ptr( asmjit::host::ebp, 8 ) );
+            (*adapter)->push( asmjit::host::ecx );
+            (*adapter)->mov( asmjit::host::eax, pProtect );
+            (*adapter)->call( asmjit::host::eax );
+            adapter->GenEpilogue( false, 4 );
+
+            NTSTATUS status = _pVEHCode.Write( handlerSize, (*adapter)->getCodeSize(), (*adapter)->make() );
+            if (!NT_SUCCESS( status ))
+            {
+                _pVEHCode.Free();
+                return status;
+            }
+
+            pProtect = static_cast<uint32_t>(_pVEHCode.ptr() + handlerSize);
+        }
+
         replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(g_symbols.LdrpInvertedFunctionTable32) );
         replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
-        replaceStub( newHandler, handlerSize, 0xDEADC0D2, static_cast<uint32_t>(g_symbols.LdrProtectMrdata) );
+        replaceStub( newHandler, handlerSize, 0xDEADC0D2, pProtect );
     }
 
     // Write handler data into target process
