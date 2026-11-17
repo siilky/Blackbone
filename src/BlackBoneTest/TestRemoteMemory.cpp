@@ -22,17 +22,17 @@ namespace Testing
             }
 
             AssertEx::NtSuccess( proc.Attach( L"explorer.exe" ) );
-            AssertEx::NtSuccess( proc.memory().Map( false ) );
+            AssertEx::NtSuccess( proc.memory().remote().Map( false ) );
 
             // Translate main module base address
             auto addr = proc.modules().GetMainModule()->baseAddress;
-            auto translated = proc.memory().TranslateAddress( addr );
+            auto translated = proc.memory().remote().TranslateAddress( addr );
             AssertEx::IsNotZero( translated );
 
-            AssertEx::NtSuccess( proc.memory().SetupHook( RemoteMemory::MemVirtualAlloc ) );
-            AssertEx::NtSuccess( proc.memory().SetupHook( RemoteMemory::MemVirtualFree ) );
-            AssertEx::NtSuccess( proc.memory().SetupHook( RemoteMemory::MemMapSection ) );
-            AssertEx::NtSuccess( proc.memory().SetupHook( RemoteMemory::MemUnmapSection ) );
+            AssertEx::NtSuccess( proc.memory().remote().SetupHook( RemoteMemory::MemVirtualAlloc ) );
+            AssertEx::NtSuccess( proc.memory().remote().SetupHook( RemoteMemory::MemVirtualFree ) );
+            AssertEx::NtSuccess( proc.memory().remote().SetupHook( RemoteMemory::MemMapSection ) );
+            AssertEx::NtSuccess( proc.memory().remote().SetupHook( RemoteMemory::MemUnmapSection ) );
         }
     };
 }

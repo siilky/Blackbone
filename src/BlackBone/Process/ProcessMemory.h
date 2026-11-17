@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <list>
+#include <memory>
 
 namespace blackbone
 {
@@ -17,7 +18,7 @@ enum class MemProtectionCasting
     useDep  // Strip executable flag if DEP is off
 };
 
-class ProcessMemory : public RemoteMemory
+class ProcessMemory
 {
 public:
     BLACKBONE_API ProcessMemory( class Process* process );
@@ -207,6 +208,18 @@ public:
     /// <param name="flag">new behavior</param>
     BLACKBONE_API void protectionCasting( MemProtectionCasting casting ) { _casting = casting; }
 
+    /// <summary>
+    /// Get remote address space mapping, created on first call.
+    /// The reference is invalidated by reset(), Process::Detach and Process::Attach.
+    /// </summary>
+    /// <returns>Remote memory mapping</returns>
+    BLACKBONE_API RemoteMemory& remote();
+
+    /// <summary>
+    /// Unmap any mapped memory, restore hooks and destroy the mapping returned by remote()
+    /// </summary>
+    BLACKBONE_API void reset() { _remote.reset(); }
+
     BLACKBONE_API inline class ProcessCore& core() { return _core; }
     BLACKBONE_API inline class Process* process()  { return _process; }
 
@@ -218,6 +231,11 @@ private:
     class Process* _process;    // Owning process object
     class ProcessCore& _core;   // Core routines
     MemProtectionCasting _casting = MemProtectionCasting::useDep;
+
+    // The deleter is bound in remote(), so code that only destroys or resets ProcessMemory
+    // (~Process, Process::Detach from Attach) does not reference ~RemoteMemory and does not
+    // link the mapping, hook, and driver code behind it. A default deleter would.
+    std::unique_ptr<RemoteMemory, void( *)(RemoteMemory*)> _remote{ nullptr, nullptr };
 };
 
 }

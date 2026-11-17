@@ -8,7 +8,9 @@ namespace blackbone
 RemoteMemory::RemoteMemory( Process* process )
     : _process( process )
 {
-    _pipeName = Utils::RandomANString() + L"_" + std::to_wstring( _process->pid() ) + L"_" + std::to_wstring( GetCurrentProcessId() );
+    // Must fit MAP_MEMORY::pipeName[32] with the terminator, or wcscpy_s in DriverControl::MapMemory
+    // aborts: 9 random chars + two separators + two 10-digit DWORD pids
+    _pipeName = Utils::RandomANString( 9 ) + L"_" + std::to_wstring( _process->pid() ) + L"_" + std::to_wstring( GetCurrentProcessId() );
 }
 
 RemoteMemory::~RemoteMemory()

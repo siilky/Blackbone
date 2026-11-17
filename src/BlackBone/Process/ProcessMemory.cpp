@@ -6,14 +6,26 @@ namespace blackbone
 {
 
 ProcessMemory::ProcessMemory( Process* process )
-    : RemoteMemory( process )
-    , _process( process )
+    : _process( process )
     , _core( process->core() )  
 {
 }
 
 ProcessMemory::~ProcessMemory()
 {
+}
+
+/// <summary>
+/// Get remote address space mapping, created on first call.
+/// The reference is invalidated by reset(), Process::Detach and Process::Attach.
+/// </summary>
+/// <returns>Remote memory mapping</returns>
+RemoteMemory& ProcessMemory::remote()
+{
+    if (!_remote)
+        _remote = { new RemoteMemory( _process ), []( RemoteMemory* p ) { delete p; } };
+
+    return *_remote;
 }
 
 /// <summary>
