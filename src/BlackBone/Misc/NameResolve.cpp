@@ -3,6 +3,7 @@
 #include "../Include/Macro.h"
 #include "../Misc/Utils.h"
 #include "../Misc/DynImport.h"
+#include "../Misc/InitOnce.h"
 #include "../Process/Process.h"
 
 #include <stdint.h>
@@ -14,7 +15,14 @@ namespace blackbone
 
 NameResolve& NameResolve::Instance()
 {
+    // Magic statics: the api set map is loaded once, on first use, and concurrent callers wait
+    // for it. Initialize selects the map layout by OS version, so InitializeOnce runs first to
+    // detect the version, also for callers that never created a Process. Neither InitializeOnce
+    // nor Initialize may call NameResolve::Instance(), or the initializing thread waits on itself.
     static NameResolve instance;
+    static const bool initialized = (InitializeOnce(), instance.Initialize());
+    (void)initialized;
+
     return instance;
 }
 

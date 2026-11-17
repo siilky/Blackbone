@@ -14,11 +14,6 @@ Process::Process()
     , _modules( *this )
     , _memory( this )
     , _threads( _core )
-    , _hooks( _memory )
-    , _localHooks( *this )
-    , _remote( *this )
-    , _mmap( *this )
-    , _nativeLdr( *this )
 {
     // Ensure InitOnce is called
     InitializeOnce();
@@ -128,9 +123,15 @@ NTSTATUS Process::Detach()
     // Reset data
     _memory.reset();
     _modules.reset();
-    _remote.reset();
-    _mmap.reset();
-    _hooks.reset();
+
+    // Parts that were never created have nothing to reset; the accessors would create them
+    if (_remote)
+        _remote->reset();
+    if (_mmap)
+        _mmap->reset();
+    if (_hooks)
+        _hooks->reset();
+
     _core.Close();
 
     return STATUS_SUCCESS;
@@ -144,9 +145,49 @@ NTSTATUS Process::EnsureInit()
 {
     auto pProc = _modules.GetNtdllExport( "NtYieldExecution", mt_default, Sections );
     if (pProc)
-        return _remote.ExecDirect( pProc->procAddress, 0 );
+        return remote().ExecDirect( pProc->procAddress, 0 );
 
     return STATUS_NOT_FOUND;
+}
+
+RemoteHook& Process::hooks()
+{
+    if (!_hooks)
+        _hooks = { new RemoteHook( _memory ), []( RemoteHook* p ) { delete p; } };
+
+    return *_hooks;
+}
+
+RemoteLocalHook& Process::localHooks()
+{
+    if (!_localHooks)
+        _localHooks = { new RemoteLocalHook( *this ), []( RemoteLocalHook* p ) { delete p; } };
+
+    return *_localHooks;
+}
+
+RemoteExec& Process::remote()
+{
+    if (!_remote)
+        _remote = { new RemoteExec( *this ), []( RemoteExec* p ) { delete p; } };
+
+    return *_remote;
+}
+
+MMap& Process::mmap()
+{
+    if (!_mmap)
+        _mmap = { new MMap( *this ), []( MMap* p ) { delete p; } };
+
+    return *_mmap;
+}
+
+NtLdr& Process::nativeLdr()
+{
+    if (!_nativeLdr)
+        _nativeLdr = { new NtLdr( *this ), []( NtLdr* p ) { delete p; } };
+
+    return *_nativeLdr;
 }
 
 /// <summary>

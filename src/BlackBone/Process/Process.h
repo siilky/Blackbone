@@ -16,6 +16,7 @@
 
 #include <string>
 #include <list>
+#include <memory>
 
 namespace blackbone
 {
@@ -205,11 +206,14 @@ public:
     BLACKBONE_API ProcessMemory&   memory()     { return _memory;     }  // Memory manipulations
     BLACKBONE_API ProcessModules&  modules()    { return _modules;    }  // Module management
     BLACKBONE_API ProcessThreads&  threads()    { return _threads;    }  // Threads
-    BLACKBONE_API RemoteHook&      hooks()      { return _hooks;      }  // Hooking code remotely
-    BLACKBONE_API RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code locally
-    BLACKBONE_API RemoteExec&      remote()     { return _remote;     }  // Remote code execution
-    BLACKBONE_API MMap&            mmap()       { return _mmap;       }  // Manual module mapping
-    BLACKBONE_API NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
+
+    // Created on first call and kept until the Process is destroyed. Detach resets remote, mmap
+    // and hooks in place if they were created and leaves localHooks and nativeLdr untouched
+    BLACKBONE_API RemoteHook&      hooks();       // Hooking code remotely
+    BLACKBONE_API RemoteLocalHook& localHooks();  // Hooking code locally
+    BLACKBONE_API RemoteExec&      remote();      // Remote code execution
+    BLACKBONE_API MMap&            mmap();        // Manual module mapping
+    BLACKBONE_API NtLdr&           nativeLdr();   // Native loader routines
 
     // Sugar
     BLACKBONE_API const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
@@ -223,11 +227,16 @@ private:
     ProcessModules  _modules;       // Module management
     ProcessMemory   _memory;        // Memory manipulations
     ProcessThreads  _threads;       // Threads
-    RemoteHook      _hooks;         // Hooking code remotely
-    RemoteLocalHook _localHooks;    // In-process remote hooks
-    RemoteExec      _remote;        // Remote code execution
-    MMap            _mmap;          // Manual module mapping
-    NtLdr           _nativeLdr;     // Native loader routines
+
+    // Construction and the deleters are bound in the accessors, so ~Process and Detach do not
+    // reference the constructors or destructors below and do not link the code behind them.
+    // A default deleter would. Detach still links the reset() of remote, mmap and hooks.
+    // Declared after the parts they use, so they are destroyed first.
+    std::unique_ptr<RemoteHook, void( *)(RemoteHook*)>           _hooks{ nullptr, nullptr };       // Hooking code remotely
+    std::unique_ptr<RemoteLocalHook, void( *)(RemoteLocalHook*)> _localHooks{ nullptr, nullptr };  // In-process remote hooks
+    std::unique_ptr<RemoteExec, void( *)(RemoteExec*)>           _remote{ nullptr, nullptr };      // Remote code execution
+    std::unique_ptr<MMap, void( *)(MMap*)>                       _mmap{ nullptr, nullptr };        // Manual module mapping
+    std::unique_ptr<NtLdr, void( *)(NtLdr*)>                     _nativeLdr{ nullptr, nullptr };   // Native loader routines
 };
 
 }

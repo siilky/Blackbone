@@ -5,7 +5,6 @@
 #include <3rd_party/VersionApi.h>
 
 #include "DynImport.h"
-#include "NameResolve.h"
 
 #include <string>
 #include <cassert>
@@ -34,8 +33,6 @@ public:
             GrantPriviledge( L"SeDebugPrivilege" );
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
-
-            NameResolve::Instance().Initialize();
             return true;
         }();
 
