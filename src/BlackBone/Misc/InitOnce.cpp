@@ -2,7 +2,6 @@
 #include "../Include/Winheaders.h"
 #include "../Include/Macro.h"
 #include "../Include/HandleGuard.h"
-#include <3rd_party/VersionApi.h>
 
 #include "DynImport.h"
 
@@ -28,8 +27,6 @@ public:
         // directly or through DynImport::get, or the initializing thread waits on itself.
         static const InitOptions effective = [options]
         {
-            InitVersion();
-
             if (options & AcquirePriveleges)
             {
                 GrantPriviledge( L"SeDebugPrivilege" );

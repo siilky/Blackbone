@@ -49,7 +49,7 @@ public:
     /// <summary>
     /// Create new thread and execute code in it. Wait until execution ends
     /// </summary>
-    /// <param name="pCode">Code to execute</param>
+    /// <param name="pCode">Code to execute. It is copied into the target without relocation, so it must be position-independent: an AsmJit call or jump to an absolute address, or an x86 reference to a label address, breaks there; call through a register, as GenCall does</param>
     /// <param name="size">Code size</param>
     /// <param name="callResult">Code return value</param>
     /// <param name="modeSwitch">Switch wow64 thread to long mode upon creation</param>
@@ -63,7 +63,7 @@ public:
     /// <summary>
     /// Execute code in context of our worker thread
     /// </summary>
-    /// <param name="pCode">Cde to execute</param>
+    /// <param name="pCode">Code to execute. It is copied into the target without relocation, so it must be position-independent: an AsmJit call or jump to an absolute address, or an x86 reference to a label address, breaks there; call through a register, as GenCall does</param>
     /// <param name="size">Code size.</param>
     /// <param name="callResult">Execution result</param>
     /// <returns>Status</returns>
@@ -72,7 +72,7 @@ public:
     /// <summary>
     /// Execute code in context of any existing thread
     /// </summary>
-    /// <param name="pCode">Cde to execute</param>
+    /// <param name="pCode">Code to execute. It is copied into the target without relocation, so it must be position-independent: an AsmJit call or jump to an absolute address, or an x86 reference to a label address, breaks there; call through a register, as GenCall does</param>
     /// <param name="size">Code size.</param>
     /// <param name="callResult">Execution result</param>
     /// <param name="thd">Target thread</param>
