@@ -44,8 +44,13 @@ namespace Testing
             UNICODE_STRING empty = { };
             UNICODE_STRING wndName = { };
 
-            constexpr wchar_t name[] = L"Program Manager";
-            SAFE_CALL( RtlInitUnicodeString, &wndName, name );
+            const auto name = L"BlackBone syscall test " + std::to_wstring( GetCurrentProcessId() );
+            // Own the hidden target window so the test does not depend on the user's desktop shell.
+            std::unique_ptr<HWND__, decltype(&DestroyWindow)> window(
+                CreateWindowExW( 0, L"STATIC", name.c_str(), WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, nullptr, nullptr ),
+                &DestroyWindow );
+            AssertEx::IsNotNull( window.get() );
+            SAFE_CALL( RtlInitUnicodeString, &wndName, name.c_str() );
 
             auto hwnd = syscall::syscall<HWND>(
                 syscall::get_index( IsWindows10OrGreater() ? L"win32u.dll" : L"user32.dll", "NtUserFindWindowEx" ),
@@ -60,12 +65,12 @@ namespace Testing
             // Not ready yet
             AssertEx::AreEqual( HWND{}, hwnd );
 #else
-            AssertEx::AreNotEqual( HWND_DESKTOP, hwnd );
+            AssertEx::AreEqual( window.get(), hwnd );
 
             wchar_t title[MAX_PATH] = { };
             GetWindowTextW( hwnd, title, _countof( title ) );
 
-            AssertEx::AreEqual( name, title );
+            AssertEx::AreEqual( name.c_str(), title );
 #endif
         }
     };

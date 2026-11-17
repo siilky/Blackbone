@@ -29,6 +29,9 @@ enum eBuildThreshold
     Build_19H1 = 18362,
     Build_19H2 = 18363,
     Build_20H1 = 19041,
+    Build_21H2 = 22000,
+    Build_22H2 = 22621,
+    Build_24H2 = 26100,
     Build_RS_MAX = 99999,
 };
 
@@ -301,6 +304,24 @@ VERSIONHELPERAPI
 IsWindows1020H1OrGreater()
 {
     return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_20H1 );
+}
+
+VERSIONHELPERAPI
+IsWindows1121H2OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_21H2 );
+}
+
+VERSIONHELPERAPI
+IsWindows1122H2OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_22H2 );
+}
+
+VERSIONHELPERAPI
+IsWindows1124H2OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_24H2 );
 }
 
 VERSIONHELPERAPI

@@ -15,6 +15,10 @@ The activation prints `'vswhere.exe' is not recognized`; that line is harmless. 
 
 Run one build or VSTest process at a time per build directory: a build rewrites `build/<arch>-<preset>/`, and a test run loads the DLLs from it. Different architectures and presets use separate directories. Run each build or test as one call whose timeout covers it.
 
+`SymbolsMatch` requires matching PDBs for the installed x86 and x64 `ntdll.dll`. The default symbol search downloads them from Microsoft's symbol server into `%TEMP%\Symbols`; an explicit `_NT_SYMBOL_PATH` selects the symbol search environment instead. A PDB-loading failure fails the test, so check symbol access before attributing it to a pattern mismatch. A successful load followed by an address mismatch identifies the affected internal symbol in the assertion message. Pattern and symbol compatibility must be checked against the installed `ntdll` files, whose version can differ from the OS build.
+
+Pattern scans use private x64 helpers with known bytes, including when the test host is x86; window-search tests create their own hidden window. The default run with driver-dependent tests skipped does not require Explorer, but still requires access to create processes, remote threads, debug events, and windows. If a restricted execution environment changes those operations, repeat the same focused VSTest invocation in a normal user session before classifying a repository failure. Driver-dependent tests remain opt-in through the build script and still require Explorer.
+
 ## Workspace
 
 - Work in the current checkout on its current branch. Create a branch or worktree only when the user asks.

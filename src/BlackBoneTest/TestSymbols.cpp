@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <3rd_party/VersionApi.h>
 
 namespace Testing
 {
@@ -17,23 +18,29 @@ namespace Testing
        
             AssertEx::NtSuccess( sl.LoadFromPatterns( ntdll32, ntdll64, fromPatterns ) );
 
-            if (NT_SUCCESS( sl.LoadFromSymbols( ntdll32, ntdll64, fromSymbols ) ))
-            {
-                AssertEx::AreEqual( fromSymbols.LdrpHandleTlsData32, fromPatterns.LdrpHandleTlsData32 );
-                AssertEx::AreEqual( fromSymbols.LdrpHandleTlsData64, fromPatterns.LdrpHandleTlsData64 );
-                AssertEx::AreEqual( fromSymbols.LdrpInvertedFunctionTable32, fromPatterns.LdrpInvertedFunctionTable32 );
-                AssertEx::AreEqual( fromSymbols.LdrpInvertedFunctionTable64, fromPatterns.LdrpInvertedFunctionTable64 );
-                AssertEx::AreEqual( fromSymbols.LdrProtectMrdata, fromPatterns.LdrProtectMrdata );
-                AssertEx::AreEqual( fromSymbols.RtlInsertInvertedFunctionTable32, fromPatterns.RtlInsertInvertedFunctionTable32 );
-                AssertEx::AreEqual( fromSymbols.RtlInsertInvertedFunctionTable64, fromPatterns.RtlInsertInvertedFunctionTable64 );
+            AssertEx::NtSuccess( sl.LoadFromSymbols( ntdll32, ntdll64, fromSymbols ), L"PDB symbol loading failed" );
 
-                AssertEx::IsNotZero( fromSymbols.LdrpReleaseTlsEntry32 );
-                AssertEx::IsNotZero( fromSymbols.LdrpReleaseTlsEntry64 );
-            }
-            else
+            if (IsWindows8Point1OrGreater())
             {
-                Logger::WriteMessage( "Failed to load symbols, aborting" );
+                AssertEx::IsNotZero( fromSymbols.LdrpInvertedFunctionTable64, L"LdrpInvertedFunctionTable64 missing from PDB" );
+                AssertEx::IsNotZero( fromSymbols.LdrProtectMrdata, L"LdrProtectMrdata missing from PDB" );
+                AssertEx::IsNotZero( fromSymbols.RtlInsertInvertedFunctionTable64, L"RtlInsertInvertedFunctionTable64 missing from PDB" );
             }
+
+            AssertEx::IsNotZero( fromSymbols.LdrpHandleTlsData32, L"LdrpHandleTlsData32 missing from PDB" );
+            AssertEx::AreEqual( fromSymbols.LdrpHandleTlsData32, fromPatterns.LdrpHandleTlsData32, L"LdrpHandleTlsData32" );
+            AssertEx::IsNotZero( fromSymbols.LdrpHandleTlsData64, L"LdrpHandleTlsData64 missing from PDB" );
+            AssertEx::AreEqual( fromSymbols.LdrpHandleTlsData64, fromPatterns.LdrpHandleTlsData64, L"LdrpHandleTlsData64" );
+            AssertEx::IsNotZero( fromSymbols.LdrpInvertedFunctionTable32, L"LdrpInvertedFunctionTable32 missing from PDB" );
+            AssertEx::AreEqual( fromSymbols.LdrpInvertedFunctionTable32, fromPatterns.LdrpInvertedFunctionTable32, L"LdrpInvertedFunctionTable32" );
+            AssertEx::AreEqual( fromSymbols.LdrpInvertedFunctionTable64, fromPatterns.LdrpInvertedFunctionTable64, L"LdrpInvertedFunctionTable64" );
+            AssertEx::AreEqual( fromSymbols.LdrProtectMrdata, fromPatterns.LdrProtectMrdata, L"LdrProtectMrdata" );
+            AssertEx::IsNotZero( fromSymbols.RtlInsertInvertedFunctionTable32, L"RtlInsertInvertedFunctionTable32 missing from PDB" );
+            AssertEx::AreEqual( fromSymbols.RtlInsertInvertedFunctionTable32, fromPatterns.RtlInsertInvertedFunctionTable32, L"RtlInsertInvertedFunctionTable32" );
+            AssertEx::AreEqual( fromSymbols.RtlInsertInvertedFunctionTable64, fromPatterns.RtlInsertInvertedFunctionTable64, L"RtlInsertInvertedFunctionTable64" );
+
+            AssertEx::IsNotZero( fromSymbols.LdrpReleaseTlsEntry32, L"LdrpReleaseTlsEntry32" );
+            AssertEx::IsNotZero( fromSymbols.LdrpReleaseTlsEntry64, L"LdrpReleaseTlsEntry64" );
         }
     };
 }

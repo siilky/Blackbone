@@ -63,8 +63,11 @@ NTSTATUS SymbolLoader::LoadFromSymbols( const pe::PEImage& ntdll32, const pe::PE
         sym32.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData32 );
         sym64.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData64 );
 
-        sym32.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable32 );
-        sym64.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable64 );
+        // Recent ntdll PDBs use the plural name for the inverted function tables.
+        if (FAILED( sym32.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable32 ) ))
+            sym32.GetSymAddress( L"LdrpInvertedFunctionTables", result.LdrpInvertedFunctionTable32 );
+        if (FAILED( sym64.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable64 ) ))
+            sym64.GetSymAddress( L"LdrpInvertedFunctionTables", result.LdrpInvertedFunctionTable64 );
 
         sym32.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable32 );
         sym64.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable64 );
