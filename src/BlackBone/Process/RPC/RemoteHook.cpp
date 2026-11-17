@@ -27,16 +27,12 @@ RemoteHook::~RemoteHook()
 /// <returns>true on success</returns>
 NTSTATUS RemoteHook::EnsureDebug()
 {
-    // Close previous debug object
-    if (_debugPID != 0 && _debugPID != _core.pid())
-    {
-        EndDebug();
-    }
-    // Already debugging
-    else if (_debugPID == _core.pid())
-    {
+    if (_core.pid() == 0)
+        return STATUS_INVALID_HANDLE;
+
+    // Already debugging; the target never changes, see Process
+    if (_debugPID != 0)
         return STATUS_SUCCESS;
-    }
 
     //
     // Check if debug is possible.

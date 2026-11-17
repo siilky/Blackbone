@@ -208,6 +208,10 @@ ProcessModules::mapModules ProcessModules::GetManualModules()
 /// <returns>Export info. If failed procAddress field is 0</returns>
 call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
 {
+    // Callers pass a GetModule result directly, which is null when the module is not loaded
+    if (!hMod)
+        return STATUS_INVALID_PARAMETER_1;
+
     return GetExport( *hMod, name_ord, baseModule );
 }
 
@@ -515,10 +519,12 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
 /// Unload specific module from target process. Can't be used to unload manually mapped modules
 /// </summary>
 /// <param name="hMod">Module to unload</param>
-/// <returns>true on success</returns>
+/// <returns>Status code</returns>
 NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
 {
     // Module not present or is manually mapped
+    if (!hMod)
+        return STATUS_INVALID_PARAMETER_1;
     if (hMod->manual || !ValidateModule( hMod->baseAddress ))
         return STATUS_NOT_FOUND;
 
@@ -538,11 +544,20 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
     a->GenCall( pUnload->procAddress, { hMod->baseAddress } );
     (*a)->ret();
 
-    _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, threadSwitch );
+    NTSTATUS status = _proc.remote().CreateRPCEnvironment( Worker_None, true );
+    if (!NT_SUCCESS( status ))
+        return status;
 
-    // Remove module from cache
-    _modules.erase( std::make_pair( hMod->name, hMod->type ) );
-    return true;
+    status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, threadSwitch );
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    // LdrUnloadDll status
+    status = static_cast<NTSTATUS>(res);
+    if (NT_SUCCESS( status ))
+        _modules.erase( std::make_pair( hMod->name, hMod->type ) );
+
+    return status;
 }
 
 /// <summary>
@@ -552,7 +567,7 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
 /// <returns>true on success</returns>
 bool ProcessModules::Unlink( const ModuleDataPtr& mod )
 {
-    return _proc.nativeLdr().Unlink( *mod );
+    return mod && _proc.nativeLdr().Unlink( *mod );
 }
 
 bool ProcessModules::Unlink( const ModuleData& mod )

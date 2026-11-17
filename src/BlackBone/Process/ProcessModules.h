@@ -190,7 +190,7 @@ public:
     /// Unload specific module from target process. Can't be used to unload manually mapped modules
     /// </summary>
     /// <param name="hMod">Module to unload</param>
-    /// <returns>true on success</returns>
+    /// <returns>Status code, including the LdrUnloadDll status</returns>
     BLACKBONE_API NTSTATUS Unload( const ModuleDataPtr& hMod );
 
     /// <summary>

@@ -21,7 +21,6 @@ namespace Testing
         {
             _fixture.Reset();
             _proc.Terminate();
-            _proc.Detach();
         }
 
         // Scan all allocated process memory

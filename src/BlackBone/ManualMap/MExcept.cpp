@@ -239,7 +239,8 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     if (partial)
         return STATUS_SUCCESS;
 
-    // VEH codecave
+    // VEH codecave. Unowned, like the module table: mapped images keep running in the target
+    // after the Process is destroyed and still need their handler
     auto mem = proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
     if (!mem)
         return mem.status;

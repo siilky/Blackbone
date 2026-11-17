@@ -19,6 +19,9 @@ namespace blackbone
 ProcessCore::ProcessCore()
     : _native( nullptr )
 {
+    // A subsystem over the null handle lets parts run before Attach: the system rejects
+    // the handle with an error status instead of the parts dereferencing a null _native
+    Init();
 }
 
 ProcessCore::~ProcessCore()
@@ -58,8 +61,13 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
 /// <returns>Status</returns>
 NTSTATUS ProcessCore::Open( HANDLE handle )
 {
+    // pid 0 marks an unattached process, so a handle without one is not taken
+    DWORD pid = GetProcessId( handle );
+    if (pid == 0)
+        return LastNtStatus();
+
     _hProcess = handle;
-    _pid = GetProcessId( _hProcess );
+    _pid = pid;
 
     // Some routines in win10 do not support pseudo handle
     if (IsWindows10OrGreater() && _pid == GetCurrentProcessId())

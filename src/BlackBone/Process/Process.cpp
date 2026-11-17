@@ -31,7 +31,9 @@ Process::~Process(void)
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
-    Detach();
+    if (_core.pid() != 0)
+        return STATUS_ALREADY_INITIALIZED;
+
     return _core.Open( pid, access );
 }
 
@@ -42,7 +44,9 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( HANDLE hProc )
 {
-    Detach();
+    if (_core.pid() != 0)
+        return STATUS_ALREADY_INITIALIZED;
+
     return _core.Open( hProc );
 }
 
@@ -54,6 +58,9 @@ NTSTATUS Process::Attach( HANDLE hProc )
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( const wchar_t* name, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
+    if (_core.pid() != 0)
+        return STATUS_ALREADY_INITIALIZED;
+
     auto pids = EnumByName( name );
     return pids.empty() ? STATUS_NOT_FOUND : Attach( pids.front(), access );
 }
@@ -77,7 +84,8 @@ NTSTATUS Process::CreateAndAttach(
     STARTUPINFOW* pStartup /*= nullptr*/
     )
 {
-    Detach();
+    if (_core.pid() != 0)
+        return STATUS_ALREADY_INITIALIZED;
 
     STARTUPINFOW si = { };
     PROCESS_INFORMATION pi = { };
@@ -112,29 +120,6 @@ NTSTATUS Process::CreateAndAttach(
     CloseHandle( pi.hThread );
 
     return status;
-}
-
-/// <summary>
-/// Detach form current process, if any
-/// </summary>
-/// <returns>Status code</returns>
-NTSTATUS Process::Detach()
-{
-    // Reset data
-    _memory.reset();
-    _modules.reset();
-
-    // Parts that were never created have nothing to reset; the accessors would create them
-    if (_remote)
-        _remote->reset();
-    if (_mmap)
-        _mmap->reset();
-    if (_hooks)
-        _hooks->reset();
-
-    _core.Close();
-
-    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -229,8 +214,10 @@ bool Process::valid()
 /// <returns>Stratus code</returns>
 NTSTATUS Process::Terminate( uint32_t code /*= 0*/ )
 {
-    TerminateProcess( _core.handle(), code );
-    return LastNtStatus();
+    if (!TerminateProcess( _core.handle(), code ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -239,6 +226,9 @@ NTSTATUS Process::Terminate( uint32_t code /*= 0*/ )
 /// <returns>Found handles or status code</returns>
 call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
 {
+    if (_core._pid == 0)
+        return STATUS_INVALID_HANDLE;
+
     ULONG bufSize = 0x10000;
     uint8_t* buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
     ULONG returnLength = 0;

@@ -53,6 +53,11 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
 std::vector<ThreadPtr> ProcessThreads::getAll() const
 {
     std::vector<ThreadPtr> result;
+
+    // pid 0 means unattached here, but in the snapshot it is the System Idle Process
+    if (_core.pid() == 0)
+        return result;
+
     auto hThreadSnapshot = Handle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
     if (!hThreadSnapshot)
         return result;

@@ -32,7 +32,6 @@ namespace Testing
         TEST_METHOD_CLEANUP( Cleanup )
         {
             _proc.Terminate();
-            _proc.Detach();
         }
 
         static LoadData MapCallback( CallbackType type, void* /*context*/, Process& /*process*/, const ModuleData& modInfo )

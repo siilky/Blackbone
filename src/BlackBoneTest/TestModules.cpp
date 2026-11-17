@@ -61,6 +61,48 @@ public:
         AssertEx::AreEqual( reinterpret_cast<ptr_t>(expected), result->procAddress );
     }
 
+    // Callers pass a GetModule result directly, which is null for a module that is not loaded
+    TEST_METHOD( MissingModule )
+    {
+        auto mod = _proc.modules().GetModule( L"no-such-module.dll" );
+
+        AssertEx::AreEqual( STATUS_INVALID_PARAMETER_1, _proc.modules().GetExport( mod, "CreateFileW" ).status );
+        AssertEx::AreEqual( STATUS_INVALID_PARAMETER_1, _proc.modules().Unload( mod ) );
+        AssertEx::IsFalse( _proc.modules().Unlink( mod ) );
+    }
+
+    TEST_METHOD( InjectUnload )
+    {
+        InjectUnload( GetTestHelperHost32(), GetTestHelperDll32() );
+        InjectUnload( GetTestHelperHost64(), GetTestHelperDll64() );
+    }
+
+    void InjectUnload( const std::wstring& hostPath, const std::wstring& dllPath )
+    {
+        // Suspended with forced loader initialization, so kernel32 is loaded before Inject looks it up
+        Process proc;
+        AssertEx::NtSuccess( proc.CreateAndAttach( hostPath, true, true ) );
+
+        auto injected = proc.modules().Inject( dllPath );
+        AssertEx::NtSuccess( injected.status );
+        AssertEx::IsNotNull( injected.result().get() );
+        auto name = injected.result()->name;
+
+        // A separate object has no RPC environment from Inject, so Unload must create its own
+        // for the new thread it runs LdrUnloadDll in
+        Process unloader;
+        AssertEx::NtSuccess( unloader.Attach( proc.pid() ) );
+
+        auto mod = unloader.modules().GetModule( name, LdrList );
+        AssertEx::IsNotNull( mod.get() );
+        AssertEx::AreEqual( STATUS_SUCCESS, unloader.modules().Unload( mod ) );
+
+        unloader.modules().reset();
+        AssertEx::IsNull( unloader.modules().GetModule( name, LdrList ).get() );
+
+        proc.Terminate();
+    }
+
 private:
     Process _proc;
 };

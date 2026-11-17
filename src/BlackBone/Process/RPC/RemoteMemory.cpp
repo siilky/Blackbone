@@ -25,6 +25,9 @@ RemoteMemory::~RemoteMemory()
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( bool mapSections )
 {
+    if (_process->pid() == 0)
+        return STATUS_INVALID_HANDLE;
+
     MapMemoryResult result = { 0 };
 
     // IPC
@@ -54,6 +57,9 @@ NTSTATUS RemoteMemory::Map( bool mapSections )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
 {
+    if (_process->pid() == 0)
+        return STATUS_INVALID_HANDLE;
+
     MapMemoryRegionResult memRes =  { 0 };
 
     // IPC
@@ -81,6 +87,9 @@ NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Unmap( )
 {
+    if (_process->pid() == 0)
+        return STATUS_INVALID_HANDLE;
+
     NTSTATUS status = Driver().UnmapMemory( _process->pid() );
 
     if (NT_SUCCESS( status ))
@@ -103,6 +112,9 @@ NTSTATUS RemoteMemory::Unmap( )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Unmap( ptr_t base, uint32_t size )
 {
+    if (_process->pid() == 0)
+        return STATUS_INVALID_HANDLE;
+
     auto searchFn = [&base]( const decltype(_mapDatabase)::value_type& val )
     {
         return base >= val.first.first && base < val.first.first + val.first.second;

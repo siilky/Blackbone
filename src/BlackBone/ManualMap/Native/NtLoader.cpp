@@ -28,6 +28,10 @@ bool NtLdr::Init( eModType initFor /*= mt_default*/ )
     if (initFor == _initializedFor)
         return true;
 
+    // Discovery on an unattached process would cache zero addresses for the later target
+    if (_process.pid() == 0)
+        return false;
+
     // Detect target module type
     _initializedFor = initFor;
     if (_initializedFor == mt_unknown)

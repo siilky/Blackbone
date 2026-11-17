@@ -16,8 +16,7 @@ ProcessMemory::~ProcessMemory()
 }
 
 /// <summary>
-/// Get remote address space mapping, created on first call.
-/// The reference is invalidated by reset(), Process::Detach and Process::Attach.
+/// Get remote address space mapping, created on first call and kept until the Process is destroyed
 /// </summary>
 /// <returns>Remote memory mapping</returns>
 RemoteMemory& ProcessMemory::remote()
@@ -127,8 +126,10 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 
         for (ptr_t memptr = dwAddress; memptr < dwAddress + dwSize; memptr = mbi.BaseAddress + mbi.RegionSize)
         {
-            if (_core.native()->VirtualQueryExT( memptr, &mbi ) != STATUS_SUCCESS)
-                continue;
+            // A failed query leaves mbi without the next region, so the loop could not advance
+            auto status = _core.native()->VirtualQueryExT( memptr, &mbi );
+            if (!NT_SUCCESS( status ))
+                return status;
 
             // Filter empty regions
             if (mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS)
@@ -136,7 +137,7 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 
             uint64_t region_ptr = memptr - dwAddress;
 
-            auto status = _core.native()->ReadProcessMemoryT(
+            status = _core.native()->ReadProcessMemoryT(
                 mbi.BaseAddress,
                 reinterpret_cast<uint8_t*>(pResult) + region_ptr,
                 static_cast<size_t>(mbi.RegionSize),

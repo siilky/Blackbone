@@ -197,9 +197,8 @@ private:
     /// <summary>
     /// Create event to synchronize APC procedures
     /// </summary>
-    /// <param name="threadID">The thread identifier.</param>
     /// <returns>Status code</returns>
-    NTSTATUS CreateAPCEvent( DWORD threadID );
+    NTSTATUS CreateAPCEvent();
 
     /// <summary>
     /// Copy executable code into remote codecave for future execution

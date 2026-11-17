@@ -42,6 +42,10 @@ NTSTATUS RemoteExec::ExecInNewThread(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
+    // The result is written to _userData, which CreateRPCEnvironment allocates
+    if (!_userData[_currentBufferIdx].valid())
+        return STATUS_INVALID_PARAMETER;
+
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
         return status;
@@ -115,8 +119,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     if (_hijackThread)
         return ExecInAnyThread( pCode, size, callResult, _hijackThread );
 
-    assert( _workerThread );
-    assert( _hWaitEvent != NULL );
+    // Created by CreateRPCEnvironment( Worker_CreateNew, true )
     if (!_workerThread || !_hWaitEvent)
         return STATUS_INVALID_PARAMETER;
 
@@ -180,9 +183,9 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     _CONTEXT32 ctx32 = { 0 };
     _CONTEXT64 ctx64 = { 0 };
 
-    assert( _hWaitEvent != NULL );
+    // Created by CreateRPCEnvironment with bEvent
     if (_hWaitEvent == NULL)
-        return STATUS_NOT_FOUND;
+        return STATUS_INVALID_PARAMETER;
     
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
@@ -318,7 +321,6 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::CreateRPCEnvironment( WorkerThreadMode mode /*= Worker_None*/, bool bEvent /*= false*/ )
 {
-    DWORD thdID = GetTickCount();       // randomize thread id
     NTSTATUS status = STATUS_SUCCESS;
 
     auto allocMem = [this]( auto& result, uint32_t size = 0x1000, DWORD prot = PAGE_EXECUTE_READWRITE ) -> NTSTATUS
@@ -355,8 +357,6 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( WorkerThreadMode mode /*= Worker_None
         auto thd = CreateWorkerThread();
         if (!thd)
             return thd.status;
-
-        thdID = thd.result();
     }
     // Get thread to hijack
     else if (mode == Worker_UseExisting)
@@ -364,13 +364,11 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( WorkerThreadMode mode /*= Worker_None
         _hijackThread = _process.threads().getMostExecuted();
         if (!_hijackThread)
             return STATUS_INVALID_THREAD;
-
-        thdID = _hijackThread->id();
     }
 
     // Create RPC sync event
     if (bEvent)
-        status = CreateAPCEvent( thdID );
+        status = CreateAPCEvent();
 
     return status;
 }
@@ -448,40 +446,23 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
 /// <summary>
 /// Create event to synchronize APC procedures
 /// </summary>
-/// <param name="threadID">The thread identifier.</param>
 /// <returns>Status code</returns>
-NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
+NTSTATUS RemoteExec::CreateAPCEvent()
 {         
     if (_hWaitEvent)
         return STATUS_SUCCESS;
 
-    auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
-
-    wchar_t pEventName[128] = { };
-    size_t len = sizeof( pEventName );
+    // Unnamed: the target gets a duplicated handle, and a name would be global to the session,
+    // so events of RemoteExec objects created close together could collide
     OBJECT_ATTRIBUTES obAttr = { };
-    UNICODE_STRING ustr = { };
-
-    // Event name
-    swprintf_s( pEventName, ARRAYSIZE( pEventName ), L"\\BaseNamedObjects\\_MMapEvent_0x%x_0x%x", threadID, GetTickCount() );
 
     const wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
     PSECURITY_DESCRIPTOR pDescriptor = nullptr;
     ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
     auto guard = std::unique_ptr<void, decltype(&LocalFree)>( pDescriptor, &LocalFree );
 
-    // Prepare Arguments
-    ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof(wchar_t));
-    ustr.MaximumLength = static_cast<USHORT>(len);
-    ustr.Buffer = pEventName;
-
-    obAttr.ObjectName = &ustr;
     obAttr.Length = sizeof(obAttr);
     obAttr.SecurityDescriptor = pDescriptor;
-
-    auto pOpenEvent = _mods.GetNtdllExport( "NtOpenEvent", mt_default, Sections );
-    if (!pOpenEvent)
-        return pOpenEvent.status;
 
     auto status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, static_cast<BOOLEAN>(FALSE) );
     if (!NT_SUCCESS( status ))

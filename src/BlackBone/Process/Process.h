@@ -81,6 +81,12 @@ struct HandleInfo
                           PROCESS_TERMINATE         | \
                           PROCESS_SUSPEND_RESUME    | \
                           PROCESS_DUP_HANDLE
+
+// Binds one target for its whole lifetime (docs/adr/0001-process-binds-one-target.md):
+// Attach and CreateAndAttach succeed at most once, later calls return STATUS_ALREADY_INITIALIZED.
+// A failed attempt leaves the object unattached, so it can be retried. Operations on an
+// unattached object return an error status, STATUS_INVALID_HANDLE where they reach the system
+// or check the pid, or an empty result. Destruction detaches.
 class Process
 {
 public:
@@ -128,12 +134,6 @@ public:
         const wchar_t* currentDir = nullptr,
         STARTUPINFOW* pStartup = nullptr
         );
-
-    /// <summary>
-    /// Detach form current process, if any
-    /// </summary>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS Detach();
 
     /// <summary>
     /// Ensure LdrInitializeProcess gets called
@@ -207,8 +207,7 @@ public:
     BLACKBONE_API ProcessModules&  modules()    { return _modules;    }  // Module management
     BLACKBONE_API ProcessThreads&  threads()    { return _threads;    }  // Threads
 
-    // Created on first call and kept until the Process is destroyed. Detach resets remote, mmap
-    // and hooks in place if they were created and leaves localHooks and nativeLdr untouched
+    // Created on first call and kept until the Process is destroyed
     BLACKBONE_API RemoteHook&      hooks();       // Hooking code remotely
     BLACKBONE_API RemoteLocalHook& localHooks();  // Hooking code locally
     BLACKBONE_API RemoteExec&      remote();      // Remote code execution
@@ -216,7 +215,8 @@ public:
     BLACKBONE_API NtLdr&           nativeLdr();   // Native loader routines
 
     // Sugar
-    BLACKBONE_API const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
+    // A copy: Attach replaces the subsystem that holds the barrier
+    BLACKBONE_API Wow64Barrier barrier() const { return _core._native->GetWow64Barrier(); }
 
 private:
     Process(const Process&) = delete;
@@ -228,10 +228,10 @@ private:
     ProcessMemory   _memory;        // Memory manipulations
     ProcessThreads  _threads;       // Threads
 
-    // Construction and the deleters are bound in the accessors, so ~Process and Detach do not
-    // reference the constructors or destructors below and do not link the code behind them.
-    // A default deleter would. Detach still links the reset() of remote, mmap and hooks.
-    // Declared after the parts they use, so they are destroyed first.
+    // Construction and the deleters are bound in the accessors, so ~Process does not reference
+    // the constructors or destructors below and does not link the code behind them. A default
+    // deleter would. Declared after _core and the parts they use, so they are destroyed first,
+    // while the process handle is still open.
     std::unique_ptr<RemoteHook, void( *)(RemoteHook*)>           _hooks{ nullptr, nullptr };       // Hooking code remotely
     std::unique_ptr<RemoteLocalHook, void( *)(RemoteLocalHook*)> _localHooks{ nullptr, nullptr };  // In-process remote hooks
     std::unique_ptr<RemoteExec, void( *)(RemoteExec*)>           _remote{ nullptr, nullptr };      // Remote code execution

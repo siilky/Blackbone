@@ -209,16 +209,10 @@ public:
     BLACKBONE_API void protectionCasting( MemProtectionCasting casting ) { _casting = casting; }
 
     /// <summary>
-    /// Get remote address space mapping, created on first call.
-    /// The reference is invalidated by reset(), Process::Detach and Process::Attach.
+    /// Get remote address space mapping, created on first call and kept until the Process is destroyed
     /// </summary>
     /// <returns>Remote memory mapping</returns>
     BLACKBONE_API RemoteMemory& remote();
-
-    /// <summary>
-    /// Unmap any mapped memory, restore hooks and destroy the mapping returned by remote()
-    /// </summary>
-    BLACKBONE_API void reset() { _remote.reset(); }
 
     BLACKBONE_API inline class ProcessCore& core() { return _core; }
     BLACKBONE_API inline class Process* process()  { return _process; }
@@ -232,9 +226,9 @@ private:
     class ProcessCore& _core;   // Core routines
     MemProtectionCasting _casting = MemProtectionCasting::useDep;
 
-    // The deleter is bound in remote(), so code that only destroys or resets ProcessMemory
-    // (~Process, Process::Detach from Attach) does not reference ~RemoteMemory and does not
-    // link the mapping, hook, and driver code behind it. A default deleter would.
+    // The deleter is bound in remote(), so code that only destroys ProcessMemory (~Process)
+    // does not reference ~RemoteMemory and does not link the mapping, hook, and driver code
+    // behind it. A default deleter would.
     std::unique_ptr<RemoteMemory, void( *)(RemoteMemory*)> _remote{ nullptr, nullptr };
 };
 

@@ -106,9 +106,11 @@ namespace Testing
 
             AssertEx::IsTrue( hook.Hook( &CloseHandle, &MyMook::hkCloseHandle, &target, HookType::HWBP ) );
 
-            Process proc;
-            proc.Attach( GetCurrentProcessId() );
-            proc.Detach();
+            // Destroying the Process closes its handle through the hooked CloseHandle
+            {
+                Process proc;
+                proc.Attach( GetCurrentProcessId() );
+            }
 
             AssertEx::IsTrue( target.handles() > 0 );
         }
