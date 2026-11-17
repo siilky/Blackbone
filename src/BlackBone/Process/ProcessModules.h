@@ -248,7 +248,6 @@ private:
 
     mapModules _modules;            // Fast lookup cache
     CriticalSection _modGuard;      // Module guard        
-    bool _ldrPatched;               // Win7 loader patch flag
 };
 
 };

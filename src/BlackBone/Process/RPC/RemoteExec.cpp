@@ -2,7 +2,6 @@
 #include "../Process.h"
 #include "../../Misc/DynImport.h"
 
-#include <3rd_party/VersionApi.h>
 #include <sddl.h>
 #include <AccCtrl.h>
 #include <Aclapi.h>
@@ -16,7 +15,6 @@ RemoteExec::RemoteExec( Process& proc )
     , _memory( _process.memory() )
     , _threads( _process.threads() )
     , _hWaitEvent( NULL )
-    , _apcPatched( false )
     , _currentBufferIdx( 0 )
 {
 }
@@ -129,28 +127,6 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 
     if (_hWaitEvent)
         ResetEvent( _hWaitEvent );
-
-    // Patch KiUserApcDispatcher 
-    /*if (!_apcPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
-    {
-        if (_proc.barrier().type == wow_64_32)
-        {
-            auto patchBase = g_PatternLoader->data().APC64PatchAddress;
-
-            if (patchBase != 0)
-            {
-                DWORD flOld = 0;
-                _memory.Protect(patchBase, 6, PAGE_EXECUTE_READWRITE, &flOld);
-                _memory.Write(patchBase + 0x2, (uint8_t)0x0C);
-                _memory.Write( patchBase + 0x4, (uint8_t)0x90 );
-                _memory.Protect( patchBase, 6, flOld, nullptr );
-            }
-
-            _apcPatched = true;
-        }
-        else
-            _apcPatched = true;
-    }*/
 
     auto pRemoteCode = _userCode[_currentBufferIdx].ptr();
 
@@ -671,8 +647,6 @@ void RemoteExec::reset()
     _userData[0].Reset();
     _userData[1].Reset();
     _workerCode.Reset();
-
-    _apcPatched = false;
 }
 
 }

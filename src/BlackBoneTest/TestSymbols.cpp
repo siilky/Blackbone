@@ -1,5 +1,4 @@
 #include "Common.h"
-#include <3rd_party/VersionApi.h>
 
 namespace Testing
 {
@@ -20,12 +19,9 @@ namespace Testing
 
             AssertEx::NtSuccess( sl.LoadFromSymbols( ntdll32, ntdll64, fromSymbols ), L"PDB symbol loading failed" );
 
-            if (IsWindows8Point1OrGreater())
-            {
-                AssertEx::IsNotZero( fromSymbols.LdrpInvertedFunctionTable64, L"LdrpInvertedFunctionTable64 missing from PDB" );
-                AssertEx::IsNotZero( fromSymbols.LdrProtectMrdata, L"LdrProtectMrdata missing from PDB" );
-                AssertEx::IsNotZero( fromSymbols.RtlInsertInvertedFunctionTable64, L"RtlInsertInvertedFunctionTable64 missing from PDB" );
-            }
+            AssertEx::IsNotZero( fromSymbols.LdrpInvertedFunctionTable64, L"LdrpInvertedFunctionTable64 missing from PDB" );
+            AssertEx::IsNotZero( fromSymbols.LdrProtectMrdata, L"LdrProtectMrdata missing from PDB" );
+            AssertEx::IsNotZero( fromSymbols.RtlInsertInvertedFunctionTable64, L"RtlInsertInvertedFunctionTable64 missing from PDB" );
 
             AssertEx::IsNotZero( fromSymbols.LdrpHandleTlsData32, L"LdrpHandleTlsData32 missing from PDB" );
             AssertEx::AreEqual( fromSymbols.LdrpHandleTlsData32, fromPatterns.LdrpHandleTlsData32, L"LdrpHandleTlsData32" );

@@ -257,14 +257,6 @@ public:
     BLACKBONE_API inline bool operator ==( const Thread& other ) { return (_id == other._id); }
 
 private:
-    /// <summary>
-    /// GetThreadId support for XP
-    /// </summary>
-    /// <param name="hThread">Thread handle</param>
-    /// <returns>Thread ID</returns>
-    DWORD GetThreadIdT( HANDLE hThread );
-
-private:
     class ProcessCore* _core;       // Core routines
 
     DWORD _id = 0;                  // Thread ID

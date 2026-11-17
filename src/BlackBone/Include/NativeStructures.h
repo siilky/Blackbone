@@ -810,9 +810,4 @@ using ACTCTXW_T  = _ACTCTXW_T<uintptr_t>;
 #include "ApiSet.h"
 
 // OS specific structures
-#include "Win7Specific.h"
 #include "Win8Specific.h"
-
-#ifdef XP_BUILD
-#include "WinXPSpecific.h"
-#endif

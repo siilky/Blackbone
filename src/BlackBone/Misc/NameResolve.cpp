@@ -3,12 +3,10 @@
 #include "../Include/Macro.h"
 #include "../Misc/Utils.h"
 #include "../Misc/DynImport.h"
-#include "../Misc/InitOnce.h"
 #include "../Process/Process.h"
 
 #include <stdint.h>
 #include <algorithm>
-#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {
@@ -16,11 +14,10 @@ namespace blackbone
 NameResolve& NameResolve::Instance()
 {
     // Magic statics: the api set map is loaded once, on first use, and concurrent callers wait
-    // for it. Initialize selects the map layout by OS version, so InitializeOnce runs first to
-    // detect the version, also for callers that never created a Process. Neither InitializeOnce
-    // nor Initialize may call NameResolve::Instance(), or the initializing thread waits on itself.
+    // for it. Initialize must not call NameResolve::Instance(), or the initializing thread waits
+    // on itself.
     static NameResolve instance;
-    static const bool initialized = (InitializeOnce(), instance.Initialize());
+    static const bool initialized = instance.Initialize();
     (void)initialized;
 
     return instance;
@@ -32,23 +29,10 @@ NameResolve& NameResolve::Instance()
 /// <returns></returns>
 bool NameResolve::Initialize()
 {
-    if (IsWindows10OrGreater())
-        return InitializeP< PAPI_SET_NAMESPACE_ARRAY_10, 
-                            PAPI_SET_NAMESPACE_ENTRY_10,
-                            PAPI_SET_VALUE_ARRAY_10,
-                            PAPI_SET_VALUE_ENTRY_10 >();
-    else if (IsWindows8Point1OrGreater())
-        return InitializeP< PAPI_SET_NAMESPACE_ARRAY, 
-                            PAPI_SET_NAMESPACE_ENTRY,
-                            PAPI_SET_VALUE_ARRAY,
-                            PAPI_SET_VALUE_ENTRY >();
-    else if (IsWindows7OrGreater())
-        return InitializeP< PAPI_SET_NAMESPACE_ARRAY_V2, 
-                            PAPI_SET_NAMESPACE_ENTRY_V2,
-                            PAPI_SET_VALUE_ARRAY_V2,
-                            PAPI_SET_VALUE_ENTRY_V2 >();
-    else
-        return true;
+    return InitializeP< PAPI_SET_NAMESPACE_ARRAY_10,
+                        PAPI_SET_NAMESPACE_ENTRY_10,
+                        PAPI_SET_VALUE_ARRAY_10,
+                        PAPI_SET_VALUE_ENTRY_10 >();
 }
 
 /// <summary>
@@ -121,10 +105,6 @@ NTSTATUS NameResolve::ResolvePath(
 
     // Leave only file name
     std::wstring filename = Utils::StripPath( path );
-
-    // 'ext-ms-' are resolved the same way 'api-ms-' are
-    if (!IsWindows10OrGreater() && filename.find( L"ext-ms-" ) == 0)
-        filename.erase( 0, 4 );
 
     //
     // ApiSchema redirection

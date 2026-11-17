@@ -17,7 +17,7 @@ Thread::Thread( HANDLE handle, ProcessCore* core )
     : _core( core )
     , _handle( handle )
 {
-    _id = (handle ? GetThreadIdT( handle ) : 0);
+    _id = (handle ? GetThreadId( handle ) : 0);
 }
 
 Thread::~Thread()
@@ -358,31 +358,5 @@ void Thread::Close()
     _handle.reset();
     _id = 0;
 }
-
-/// <summary>
-/// GetThreadId support for XP
-/// </summary>
-/// <param name="hThread">Thread handle</param>
-/// <returns>Thread ID</returns>
-DWORD Thread::GetThreadIdT( HANDLE hThread )
-{
-    static auto pGetThreadId = (decltype(&GetThreadId))GetProcAddress( GetModuleHandleW( L"kernel32.dll" ), "GetThreadId" );
-    if (pGetThreadId != nullptr)
-    {
-        return pGetThreadId( hThread );
-    }
-    // XP version
-    else
-    {
-        _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { 0 };
-        ULONG bytes = 0;
-        
-        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ))
-            return tbi.ClientID.UniqueThread;
-
-        return 0;
-    }
-}
-
 
 }

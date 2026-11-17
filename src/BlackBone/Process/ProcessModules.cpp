@@ -4,7 +4,6 @@
 #include "RPC/RemoteExec.h"
 #include "../Misc/NameResolve.h"
 #include "../Misc/Utils.h"
-#include "../Symbols/SymbolData.h"
 #include "../Asm/AsmFactory.h"
 
 #include <memory>
@@ -16,15 +15,12 @@
 #include <metahost.h>
 #endif
 
-#include <3rd_party/VersionApi.h>
-
 namespace blackbone
 {
 ProcessModules::ProcessModules( class Process& proc )
     : _proc( proc )
     , _memory( _proc.memory() )
     , _core( _proc.core() )
-    , _ldrPatched( false )
 {
 }
 
@@ -459,23 +455,6 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     auto pLdrLoadDll = GetNtdllExport( "LdrLoadDll", img.mType(), Sections );
     if (!pLdrLoadDll)
         return pLdrLoadDll.status;
-
-    // Patch LdrFindOrMapDll to enable kernel32.dll loading
-    if (switchMode == ForceSwitch && !_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
-    {
-        uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-        auto patchBase = GetSymbols().LdrKernel32PatchAddress;
-
-        if (patchBase != 0)
-        {
-            DWORD flOld = 0;
-            _memory.Protect( patchBase, sizeof( patch ), PAGE_EXECUTE_READWRITE, &flOld );
-            _memory.Write( patchBase, sizeof( patch ), patch );
-            _memory.Protect( patchBase, sizeof( patch ), flOld, nullptr );
-        }
-
-        _ldrPatched = true;
-    }
 
     auto a = AsmFactory::GetAssembler( img.mType() );
 
@@ -971,7 +950,6 @@ void ProcessModules::reset()
     CSLock lck( _modGuard );
 
     _modules.clear(); 
-    _ldrPatched = false;
 }
 
 }

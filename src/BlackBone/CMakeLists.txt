@@ -1,4 +1,3 @@
-option(BLACKBONE_XP_BUILD "Build for Windows XP; needs an XP-capable toolset such as -T v141_xp" OFF)
 set(BLACKBONE_TRACE "" CACHE STRING "Trace output: OFF, FILE, or CONSOLE (console and file); empty selects CONSOLE in Debug and OFF otherwise")
 set_property(CACHE BLACKBONE_TRACE PROPERTY STRINGS "" OFF FILE CONSOLE)
 
@@ -84,12 +83,8 @@ else()
     target_compile_definitions(BlackBone PUBLIC BLACKBONE_STATIC)
 endif()
 
-# Public headers depend on these macros (Trace.hpp, NativeStructures.h, Utils.h),
+# Public headers depend on these macros (Trace.hpp),
 # so consumers must compile with the same values as the library.
-if(BLACKBONE_XP_BUILD)
-    target_compile_definitions(BlackBone PUBLIC XP_BUILD)
-endif()
-
 if(BLACKBONE_TRACE STREQUAL "")
     target_compile_definitions(BlackBone PUBLIC $<IF:$<CONFIG:Debug>,CONSOLE_TRACE,BLACKBONE_NO_TRACE>)
 elseif(BLACKBONE_TRACE STREQUAL "OFF")

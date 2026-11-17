@@ -6,8 +6,6 @@
 #include "../../Misc/trace.hpp"
 #include "../../Symbols/SymbolData.h"
 
-#include <3rd_party/VersionApi.h>
-
 namespace blackbone
 {
 
@@ -42,15 +40,13 @@ bool NtLdr::Init( eModType initFor /*= mt_default*/ )
     {
         FindLdrHeap<uint32_t>();
         FindLdrpHashTable<uint32_t>();
-        if (IsWindows8OrGreater())
-            FindLdrpModuleIndexBase<uint32_t>();
+        FindLdrpModuleIndexBase<uint32_t>();
     }
     else
     {
         FindLdrHeap<uint64_t>();
         FindLdrpHashTable<uint64_t>();
-        if (IsWindows8OrGreater())
-            FindLdrpModuleIndexBase<uint64_t>();
+        FindLdrpModuleIndexBase<uint64_t>();
     }
 
     _nodeMap.clear();
@@ -61,7 +57,7 @@ bool NtLdr::Init( eModType initFor /*= mt_default*/ )
         BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
     if (_LdrpHashTable == 0)
         BLACKBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
-    if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
+    if (_LdrpModuleIndexBase == 0)
         BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
 #endif
 
@@ -70,7 +66,7 @@ bool NtLdr::Init( eModType initFor /*= mt_default*/ )
 
 /// <summary>
 /// Add module to some loader structures 
-/// (LdrpHashTable, LdrpModuleIndex( win8+ only ), InMemoryOrderModuleList( win7 only ))
+/// (LdrpHashTable, LdrpModuleIndex)
 /// </summary>
 /// <param name="mod">Module data</param>
 /// <returns>true on success</returns>
@@ -85,22 +81,15 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
         Init( mod.type );
 
     bool x64Image = (mod.type == mt_mod64);
-    bool w8 = IsWindows8OrGreater();
 
-    // Win 8 and higher
-    if (w8)
-        mod.ldrPtr = CALL_64_86( x64Image, InitW8Node, mod );
-    // Windows 7 and earlier
-    else
-        mod.ldrPtr = CALL_64_86( x64Image, InitW7Node, mod );
-
+    mod.ldrPtr = CALL_64_86( x64Image, InitW8Node, mod );
     if (mod.ldrPtr == 0)
         return false;
 
     _nodeMap.emplace( mod.baseAddress, mod.ldrPtr );
 
     // Insert into module graph
-    if (mod.flags & Ldr_ModList && w8)
+    if (mod.flags & Ldr_ModList)
         CALL_64_86( x64Image, InsertTreeNode, mod.ldrPtr, mod );
 
     // Insert into LdrpHashTable
@@ -111,14 +100,13 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
     }
 
     // Insert into ldr lists
-    if (mod.flags & Ldr_ThdCall || (!w8 && mod.flags & Ldr_ModList))
+    if (mod.flags & Ldr_ThdCall)
     {
         _process.memory().Write( FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, Flags ), 0x80004 );
         ptr_t loadPtr = 0, initptr = 0;
 
         loadPtr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, InLoadOrderLinks );
-        if(w8)
-            initptr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
+        initptr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
 
         CALL_64_86( x64Image, InsertMemModuleNode, 0, loadPtr, initptr );
     }
@@ -156,7 +144,6 @@ ptr_t NtLdr::SetNode( ptr_t ptr, Module pModule )
 /// <returns>Status code</returns>
 NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
 {
-    bool wxp = IsWindowsXPOrGreater() && !IsWindowsVistaOrGreater();
     ptr_t pNode = _nodeMap.count( mod.baseAddress ) ? _nodeMap[mod.baseAddress] : 0;
 
     // Allocate appropriate structure
@@ -179,32 +166,6 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
     if (mod.ldrPtr == 0)
         mod.ldrPtr = pNode;
 
-    // Manually add TLS table
-    if (wxp && tlsPtr != 0)
-    {
-        ptr_t pTeb = 0;
-        pTeb = _process.remote().getExecThread()->teb( static_cast<_TEB32*>(nullptr) );
-
-        auto mem = _process.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-        if (!mem)
-            return mem.status;
-
-        auto tlsStore = std::move( mem.result() );
-
-        IMAGE_TLS_DIRECTORY remoteTls = { 0 };
-        _process.memory().Read( tlsPtr, sizeof( remoteTls ), &remoteTls );
-
-        auto size = remoteTls.EndAddressOfRawData - remoteTls.StartAddressOfRawData;
-        std::unique_ptr<uint8_t[]> buf( new uint8_t[size]() );
-
-        _process.memory().Read( remoteTls.StartAddressOfRawData, size, buf.get() );
-
-        tlsStore.Write( 0, tlsStore.ptr<uintptr_t>() + 0x800 );
-        tlsStore.Write( 0x800, size, buf.get() );
-
-        return _process.memory().Write( fieldPtr( pTeb, &_TEB32::ThreadLocalStoragePointer ), tlsStore.ptr<uint32_t>() );
-    }
-
     // Use native method
     if (LdrpHandleTlsData)
     {
@@ -212,7 +173,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
         uint64_t result = 0;
 
         a->GenPrologue();
-        a->GenCall( LdrpHandleTlsData, { pNode }, IsWindows8Point1OrGreater() ? cc_thiscall : cc_stdcall );
+        a->GenCall( LdrpHandleTlsData, { pNode }, cc_thiscall );
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
 
@@ -260,12 +221,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 
         a->GenPrologue();
 
-        if (IsWindows8Point1OrGreater())
-            a->GenCall( RtlInsertInvertedFunctionTable, { mod.baseAddress, mod.size }, cc_fastcall );
-        else if (IsWindows8OrGreater())
-            a->GenCall( RtlInsertInvertedFunctionTable, { mod.baseAddress, mod.size } );
-        else
-            a->GenCall( RtlInsertInvertedFunctionTable, { LdrpInvertedFunctionTable, mod.baseAddress, mod.size } );
+        a->GenCall( RtlInsertInvertedFunctionTable, { mod.baseAddress, mod.size }, cc_fastcall );
 
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
@@ -325,20 +281,10 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
         return false;
     };
 
-    if (IsWindows8OrGreater())
-    {
-        if(mod.type == mt_mod64)
-            return InsertP( _RTL_INVERTED_FUNCTION_TABLE8<DWORD64>() );
-        else
-            return InsertP( _RTL_INVERTED_FUNCTION_TABLE8<DWORD>() );
-    }
+    if (mod.type == mt_mod64)
+        return InsertP( _RTL_INVERTED_FUNCTION_TABLE8<DWORD64>() );
     else
-    {
-        if (mod.type == mt_mod64)
-            return InsertP( _RTL_INVERTED_FUNCTION_TABLE7<DWORD64>() );
-        else
-            return InsertP( _RTL_INVERTED_FUNCTION_TABLE7<DWORD>() );
-    }
+        return InsertP( _RTL_INVERTED_FUNCTION_TABLE8<DWORD>() );
 }
 
 /// <summary>
@@ -365,7 +311,7 @@ NTSTATUS NtLdr::UnloadTLS( const NtLdrEntry& mod, bool noThread /*= false*/ )
     uint64_t result = 0;
 
     a->GenPrologue();
-    a->GenCall( LdrpReleaseTlsEntry, { mod.ldrPtr, 0 }, IsWindows8Point1OrGreater() ? cc_fastcall : cc_stdcall );
+    a->GenCall( LdrpReleaseTlsEntry, { mod.ldrPtr, 0 }, cc_fastcall );
 
     _process.remote().AddReturnWithEvent( *a );
     a->GenEpilogue();
@@ -471,32 +417,7 @@ ptr_t NtLdr::InitW8Node( NtLdrEntry& mod )
 }
 
 /// <summary>
-///  Initialize OS-specific module entry
-/// </summary>
-/// <param name="mod">Module data</param>
-/// <returns>Pointer to created entry</returns>
-template<typename T>
-ptr_t NtLdr::InitW7Node( NtLdrEntry& mod )
-{
-    using EntryType = _LDR_DATA_TABLE_ENTRY_W7<T>;
-
-    ptr_t entryPtr = InitBaseNode<T>( mod );
-    if (!entryPtr)
-        return 0;
-
-    // Forward Links
-    _process.memory().Write( fieldPtr( entryPtr, &EntryType::ForwarderLinks ), fieldPtr( entryPtr, &EntryType::ForwarderLinks ) );
-    _process.memory().Write( fieldPtr( entryPtr, &EntryType::ForwarderLinks ) + sizeof( T ), fieldPtr( entryPtr, &EntryType::ForwarderLinks ) );
-
-    // Static links
-    _process.memory().Write( fieldPtr( entryPtr, &EntryType::StaticLinks ), fieldPtr( entryPtr, &EntryType::StaticLinks ) );
-    _process.memory().Write( fieldPtr( entryPtr, &EntryType::StaticLinks ) + sizeof( T ), fieldPtr( entryPtr, &EntryType::StaticLinks ) );
-
-    return entryPtr;
-}
-
-/// <summary>
-/// Insert entry into win8 module graph
+/// Insert entry into module graph
 /// </summary>
 /// <param name="nodePtr">Node to insert</param>
 /// <param name="mod">Module data</param>
@@ -504,7 +425,7 @@ template<typename T>
 void NtLdr::InsertTreeNode( ptr_t nodePtr, const NtLdrEntry& mod )
 {
     //
-    // Win8 module tree
+    // Module tree
     //
     auto root = _process.memory().Read<T>( _LdrpModuleIndexBase );
     if (!root)
@@ -653,18 +574,10 @@ void NtLdr::InsertTailList( ptr_t ListHead, ptr_t Entry )
 ULONG NtLdr::HashString( const std::wstring& str )
 {
     ULONG hash = 0;
+    UNICODE_STRING ustr;
 
-    if (IsWindows8OrGreater())
-    {
-        UNICODE_STRING ustr;
-        SAFE_CALL( RtlInitUnicodeString, &ustr, str.c_str() );
-        SAFE_NATIVE_CALL( RtlHashUnicodeString, &ustr, BOOLEAN(TRUE), 0, &hash );
-    }
-    else
-    {
-        for (auto& ch : str)
-            hash += 0x1003F * static_cast<unsigned short>(SAFE_CALL( RtlUpcaseUnicodeChar, ch ));
-    }
+    SAFE_CALL( RtlInitUnicodeString, &ustr, str.c_str() );
+    SAFE_NATIVE_CALL( RtlHashUnicodeString, &ustr, BOOLEAN(TRUE), 0, &hash );
 
     return hash;
 }
@@ -767,7 +680,7 @@ bool NtLdr::FindLdrpHashTable()
 
 
 /// <summary>
-/// Find LdrpModuleIndex variable under win8
+/// Find LdrpModuleIndex variable
 /// </summary>
 /// <returns>true on success</returns>
 template<typename T>
@@ -865,8 +778,7 @@ bool NtLdr::Unlink( const ModuleData& mod, bool noThread /*= false*/ )
 
     // Unlink from graph
     // TODO: Unlink from _LdrpMappingInfoIndex. Still can't decide if it is required.
-    if (IsWindows8OrGreater())
-        ldrEntry = CALL_64_86( x64Image, UnlinkTreeNode, mod, ldrEntry, noThread );
+    ldrEntry = CALL_64_86( x64Image, UnlinkTreeNode, mod, ldrEntry, noThread );
 
     return ldrEntry != 0;
 }

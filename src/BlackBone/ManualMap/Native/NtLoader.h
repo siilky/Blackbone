@@ -12,7 +12,7 @@ namespace blackbone
 enum LdrRefFlags
 {
     Ldr_None      = 0x00,   // Do not create any reference
-    Ldr_ModList   = 0x01,   // Add to module list -  LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only )
+    Ldr_ModList   = 0x01,   // Add to module list - LdrpModuleIndex
     Ldr_HashTable = 0x02,   // Add to LdrpHashTable
     Ldr_ThdCall   = 0x04,   // Add to thread callback list (dllmain will be called with THREAD_ATTACH/DETACH reasons)
     Ldr_All       = 0xFF,   // Add to everything
@@ -43,7 +43,7 @@ public:
 
     /// <summary>
     /// Add module to some loader structures 
-    /// (LdrpHashTable, LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only ))
+    /// (LdrpHashTable, LdrpModuleIndex)
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <returns>true on success</returns>
@@ -90,7 +90,7 @@ private:
     bool FindLdrpHashTable();
 
     /// <summary>
-    /// Find LdrpModuleIndex variable under win8
+    /// Find LdrpModuleIndex variable
     /// </summary>
     /// <returns>true on success</returns>
     template<typename T>
@@ -120,15 +120,7 @@ private:
     ptr_t InitW8Node( NtLdrEntry& mod );
 
     /// <summary>
-    ///  Initialize OS-specific module entry
-    /// </summary>
-    /// <param name="mod">Module data</param>
-    /// <returns>Pointer to created entry</returns>
-    template<typename T>
-    ptr_t InitW7Node( NtLdrEntry& mod );
-
-    /// <summary>
-    /// Insert entry into win8 module graph
+    /// Insert entry into module graph
     /// </summary>
     /// <param name="nodePtr">Node to insert</param>
     /// <param name="mod">Module data</param>

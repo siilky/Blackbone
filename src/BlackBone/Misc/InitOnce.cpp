@@ -86,7 +86,6 @@ public:
         LOAD_IMPORT( "RtlInitUnicodeString",                     hNtdll );
         LOAD_IMPORT( "RtlFreeUnicodeString",                     hNtdll );
         LOAD_IMPORT( "RtlHashUnicodeString",                     hNtdll );
-        LOAD_IMPORT( "RtlUpcaseUnicodeChar",                     hNtdll );
         LOAD_IMPORT( "NtQueryInformationProcess",                hNtdll );
         LOAD_IMPORT( "NtSetInformationProcess",                  hNtdll );
         LOAD_IMPORT( "NtQueryInformationThread",                 hNtdll );

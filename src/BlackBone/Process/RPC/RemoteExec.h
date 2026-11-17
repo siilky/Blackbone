@@ -238,7 +238,6 @@ private:
     MemBlock  _workerCode;      // Worker thread address space
     MemBlock  _userCode[2];     // Codecave for code execution
     MemBlock  _userData[2];     // Region to store copied structures and strings
-    bool      _apcPatched;      // KiUserApcDispatcher was patched
     int       _currentBufferIdx;// Index of the currently used _userCode/_userData block. See SwitchActiveBuffer().
 };
 

@@ -1,5 +1,4 @@
 #include <BlackBone/Process/Process.h>
-#include <3rd_party/VersionApi.h>
 
 #include <iostream>
 #include <set>
@@ -20,12 +19,6 @@ void MapCalcFromFile()
 
     nativeMods.emplace( L"combase.dll" );
     nativeMods.emplace( L"user32.dll" );
-    if (WinVer().ver == Win7)
-    {
-        nativeMods.emplace( L"gdi32.dll" );
-        nativeMods.emplace( L"msvcr120.dll" );
-        nativeMods.emplace( L"msvcp120.dll" );
-    }
 
     modList.emplace( L"windows.storage.dll" );
     modList.emplace( L"shell32.dll" );

@@ -85,6 +85,7 @@
 
 ## Requirements
 
+- Windows 10 or later, for building and at run time ([ADR 0002](docs/adr/0002-windows-10-minimum.md))
 - Visual Studio 2017 15.7 or higher with the C++ desktop workload, including the C++ unit test framework (`VC/Auxiliary/VS/UnitTest`), which the native tests build against
 - CMake 3.21 or higher and Ninja
 - Windows SDK 10.0.17134 or higher
@@ -116,7 +117,6 @@ All targets compile with `/sdl`. Release uses whole-program optimization (`/GL`,
 Options:
 
 - `BLACKBONE_TRACE`: `OFF`, `FILE`, or `CONSOLE` (console and file). Empty, the default, selects `CONSOLE` in Debug and `OFF` otherwise.
-- `BLACKBONE_XP_BUILD`: Windows XP support; requires an XP-capable toolset, such as `v141_xp` selected with `-T` under a Visual Studio generator.
 - `BLACKBONE_TEST_SKIP_DRIVER`: mark the tests that need the BlackBone driver as ignored.
 
 The driver builds separately with `src/BlackBoneDrv/BlackBoneDrv.sln`.

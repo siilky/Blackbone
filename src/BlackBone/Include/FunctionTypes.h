@@ -169,11 +169,6 @@ typedef int (NTAPI* fnRtlRbRemoveNode)(
     _RTL_BALANCED_NODE<DWORD_PTR>*  Node
     );
 
-// RtlUpcaseUnicodeChar
-typedef WCHAR( NTAPI *fnRtlUpcaseUnicodeChar )(
-    WCHAR chr
-    );
-
 // RtlEncodeSystemPointer
 typedef PVOID( NTAPI *fnRtlEncodeSystemPointer )(
     IN PVOID Pointer

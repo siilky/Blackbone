@@ -2,7 +2,6 @@
 #include "ProcessCore.h"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
-#include <3rd_party/VersionApi.h>
 
 #ifdef USE32
 #include "../Subsystem/Wow64Subsystem.h"
@@ -41,7 +40,7 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
     _hProcess = (pid == GetCurrentProcessId()) ? GetCurrentProcess() : OpenProcess( access, false, pid );
 
     // Some routines in win10 do not support pseudo handle
-    if (IsWindows10OrGreater() && pid == GetCurrentProcessId())
+    if (pid == GetCurrentProcessId())
         _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, pid );
 
     if (_hProcess)
@@ -70,7 +69,7 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
     _pid = pid;
 
     // Some routines in win10 do not support pseudo handle
-    if (IsWindows10OrGreater() && _pid == GetCurrentProcessId())
+    if (_pid == GetCurrentProcessId())
         _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, _pid );
 
     return Init();

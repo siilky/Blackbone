@@ -1,5 +1,4 @@
 #include "Common.h"
-#include <3rd_party/VersionApi.h>
 
 namespace Microsoft::VisualStudio::CppUnitTestFramework {
     template<> inline std::wstring ToString<HWND__>( HWND__* t ) { RETURN_WIDE_STRING( t ); }
@@ -53,7 +52,7 @@ namespace Testing
             SAFE_CALL( RtlInitUnicodeString, &wndName, name.c_str() );
 
             auto hwnd = syscall::syscall<HWND>(
-                syscall::get_index( IsWindows10OrGreater() ? L"win32u.dll" : L"user32.dll", "NtUserFindWindowEx" ),
+                syscall::get_index( L"win32u.dll", "NtUserFindWindowEx" ),
                 HWND_DESKTOP,
                 nullptr,
                 &empty,
