@@ -5,7 +5,7 @@
 - `src/BlackBone/` contains the C++ user-mode library, organized by process, memory, RPC, hooks, PE mapping, and symbols.
 - `src/BlackBoneDrv/` contains the C kernel driver and its separate solution.
 - `src/BlackBoneTest/` contains native C++ tests; `Testing/` supplies prebuilt helper executables and DLLs.
-- `src/Samples/` demonstrates library usage. `src/PythonicBlackBone/` contains a ctypes-based Python wrapper and a manual memory-access example.
+- `src/Samples/` demonstrates library usage; its `MinimalSample` target only attaches and reads memory, so its linked size is the library's fixed cost for any consumer. `src/PythonicBlackBone/` contains a ctypes-based Python wrapper and a manual memory-access example.
 - `src/3rd_party/` holds bundled dependencies. `.github/workflows/` defines library/test and driver builds. `scripts/` holds build tooling. Generated library outputs belong under `build/`.
 
 ## Build, Test, and Development Commands
