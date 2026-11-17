@@ -61,7 +61,6 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
 
     tHandle.Value &= 0xFFFFFFFFFFFFFFFC;
 
-#if defined ( _WIN10_ )
     if (TableCode != 0)
     {
         if (TableCode == 1)
@@ -78,43 +77,6 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
     {
         return (PHANDLE_TABLE_ENTRY)(HandleTable->TableCode + 4 * tHandle.Value);
     }
-#elif defined ( _WIN7_ )
-    ULONG_PTR Diff = HandleTable->TableCode - TableCode;
-
-    if (TableCode != 0)
-    {
-        if (TableCode == 1)
-        {
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tHandle.Value & 0x7FC) >> 9)) + 4 * (tHandle.Value & 0x7FC));
-        }
-        else
-        {
-            ULONG_PTR tmp = (tHandle.Value - tHandle.Value & 0x7FC) >> 9;
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tmp - tmp & 0xFFF) >> 10)) + (tmp & 0xFFF)) + 4 * (tHandle.Value & 0x7FC));
-        }
-    }
-    else
-    {
-        return (PHANDLE_TABLE_ENTRY)(Diff + 4 * tHandle.Value);
-    }
-#else
-    if (TableCode != 0)
-    {
-        if (TableCode == 1)
-        {
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 10) - 1) + 4 * (tHandle.Value & 0x3FF));
-        }
-        else
-        {
-            ULONG_PTR tmp = tHandle.Value >> 10;
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 19) - 2) + 8 * (tmp & 0x1FF)) + 4 * (tHandle.Value & 0x3FF));
-        }
-    }
-    else
-    {
-        return (PHANDLE_TABLE_ENTRY)(HandleTable->TableCode + 4 * tHandle.Value);
-    }
-#endif
 }
 
 
@@ -463,52 +425,6 @@ NTSTATUS AllocateInDiscardedMemory( IN ULONG size, OUT PVOID* ppFoundBase )
 
     return STATUS_NOT_FOUND;
 }
-
-
-
-#if defined(_WIN8_) || defined (_WIN7_)
-
-NTSTATUS
-NTAPI
-ZwProtectVirtualMemory(
-    IN HANDLE ProcessHandle,
-    IN OUT PVOID* BaseAddress,
-    IN OUT SIZE_T* NumberOfBytesToProtect,
-    IN ULONG NewAccessProtection,
-    OUT PULONG OldAccessProtection
-    )
-{
-    NTSTATUS status = STATUS_SUCCESS;
-
-    fnNtProtectVirtualMemory NtProtectVirtualMemory = (fnNtProtectVirtualMemory)(ULONG_PTR)GetSSDTEntry( dynData.NtProtectIndex );
-    if (NtProtectVirtualMemory)
-    {
-        //
-        // If previous mode is UserMode, addresses passed into NtProtectVirtualMemory must be in user-mode space
-        // Switching to KernelMode allows usage of kernel-mode addresses
-        //
-        PUCHAR pPrevMode = (PUCHAR)PsGetCurrentThread() + dynData.PrevMode;
-        UCHAR prevMode = *pPrevMode;
-        PVOID BaseCopy = NULL;
-        SIZE_T SizeCopy = 0;
-        *pPrevMode = KernelMode;
-
-        if (BaseAddress)
-            BaseCopy = *BaseAddress;
-
-        if (NumberOfBytesToProtect)
-            SizeCopy = *NumberOfBytesToProtect;
-
-        status = NtProtectVirtualMemory( ProcessHandle, &BaseCopy, &SizeCopy, NewAccessProtection, OldAccessProtection );
-
-        *pPrevMode = prevMode;
-    }
-    else
-        status = STATUS_NOT_FOUND;
-
-    return status;
-}
-#endif
 
 NTSTATUS
 NTAPI

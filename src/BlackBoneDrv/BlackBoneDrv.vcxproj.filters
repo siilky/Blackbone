@@ -48,15 +48,6 @@
     <ClInclude Include="NativeStructs.h">
       <Filter>Include\Native</Filter>
     </ClInclude>
-    <ClInclude Include="NativeStructs7.h">
-      <Filter>Include\Native</Filter>
-    </ClInclude>
-    <ClInclude Include="NativeStructs8.h">
-      <Filter>Include\Native</Filter>
-    </ClInclude>
-    <ClInclude Include="NativeStructs81.h">
-      <Filter>Include\Native</Filter>
-    </ClInclude>
     <ClInclude Include="VadRoutines.h">
       <Filter>Include</Filter>
     </ClInclude>

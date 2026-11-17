@@ -3,7 +3,6 @@
 #include "Routines.h"
 #include "BlackBoneDef.h"
 #include "Utils.h"
-#include "apiset.h"
 #include <ntstrsafe.h>
 
 #define IMAGE32(hdr) (hdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
@@ -14,22 +13,10 @@
 #define TLS_VAL_T(hdr, ptr, val) (IMAGE64(hdr) ? ((PIMAGE_TLS_DIRECTORY64)ptr)->val : ((PIMAGE_TLS_DIRECTORY32)ptr)->val)
 #define CFG_DIR_VAL_T(hdr, dir, val) (IMAGE64(hdr) ? ((PIMAGE_LOAD_CONFIG_DIRECTORY64)dir)->val : ((PIMAGE_LOAD_CONFIG_DIRECTORY32)dir)->val)
 
-#if defined (_WIN10_)
 typedef PAPI_SET_VALUE_ENTRY_10     PAPISET_VALUE_ENTRY;
 typedef PAPI_SET_VALUE_ARRAY_10     PAPISET_VALUE_ARRAY;
 typedef PAPI_SET_NAMESPACE_ENTRY_10 PAPISET_NAMESPACE_ENTRY;
 typedef PAPI_SET_NAMESPACE_ARRAY_10 PAPISET_NAMESPACE_ARRAY;
-#elif defined (_WIN81_)
-typedef PAPI_SET_VALUE_ENTRY        PAPISET_VALUE_ENTRY;
-typedef PAPI_SET_VALUE_ARRAY        PAPISET_VALUE_ARRAY;
-typedef PAPI_SET_NAMESPACE_ENTRY    PAPISET_NAMESPACE_ENTRY;
-typedef PAPI_SET_NAMESPACE_ARRAY    PAPISET_NAMESPACE_ARRAY;
-#else
-typedef PAPI_SET_VALUE_ENTRY_V2     PAPISET_VALUE_ENTRY;
-typedef PAPI_SET_VALUE_ARRAY_V2     PAPISET_VALUE_ARRAY;
-typedef PAPI_SET_NAMESPACE_ENTRY_V2 PAPISET_NAMESPACE_ENTRY;
-typedef PAPI_SET_NAMESPACE_ARRAY_V2 PAPISET_NAMESPACE_ARRAY;
-#endif
 
 PLIST_ENTRY PsLoadedModuleList;
 extern DYNAMIC_DATA dynData;
@@ -895,15 +882,10 @@ NTSTATUS BBResolveApiSet(
         wchar_t apiNameBuf[255] = { 0 };
         UNICODE_STRING apiName = { 0 };
 
-#ifdef _WIN10_
         pDescriptor = (PAPISET_NAMESPACE_ENTRY)((PUCHAR)pApiSetMap + pApiSetMap->End + i * sizeof( API_SET_NAMESPACE_ENTRY_10 ));
         pHostArray = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pApiSetMap->Start + sizeof( API_SET_VALUE_ARRAY_10 ) * pDescriptor->Size);
 
         memcpy( apiNameBuf, (PUCHAR)pApiSetMap + pHostArray->NameOffset, pHostArray->NameLength );
-#else
-        pDescriptor = pApiSetMap->Array + i;
-        memcpy( apiNameBuf, (PUCHAR)pApiSetMap + pDescriptor->NameOffset, pDescriptor->NameLength );
-#endif   
         RtlUnicodeStringInit( &apiName, apiNameBuf );
 
         // Check if this is a target api
@@ -913,12 +895,7 @@ NTSTATUS BBResolveApiSet(
             wchar_t apiHostNameBuf[255] = { 0 };
             UNICODE_STRING apiHostName = { 0 };
 
-#ifdef _WIN10_
             pHost = (PAPISET_VALUE_ENTRY)((PUCHAR)pApiSetMap + pHostArray->DataOffset);
-#else
-            pHostArray = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pDescriptor->DataOffset);
-            pHost = pHostArray->Array;
-#endif
             // Sanity check
             if (pHostArray->Count < 1)
                 return STATUS_NOT_FOUND;

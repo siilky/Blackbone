@@ -152,10 +152,6 @@ typedef PULONG PWIN32_PROTECTION_MASK;
 
 typedef enum _WinVer
 {
-    WINVER_7      = 0x0610,
-    WINVER_7_SP1  = 0x0611,
-    WINVER_8      = 0x0620,
-    WINVER_81     = 0x0630,
     WINVER_10     = 0x0A00,
     WINVER_10_RS1 = 0x0A01, // Anniversary update
     WINVER_10_RS2 = 0x0A02, // Creators update
@@ -184,7 +180,6 @@ typedef struct _DYNAMIC_DATA
     ULONG EProcessFlags2;   // EPROCESS::Flags2
     ULONG ObjTable;         // EPROCESS::ObjectTable
     ULONG VadRoot;          // EPROCESS::VadRoot
-    ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
     ULONG NtCreateThdExIndex; // NtCreateThreadEx SSDT index
     ULONG NtTermThdIndex;   // NtTerminateThread SSDT index
     ULONG PrevMode;         // KTHREAD::PreviousMode
@@ -227,29 +222,6 @@ typedef PFN_NUMBER( NTAPI* fnMiAllocateDriverPage )(IN PMMPTE pPTE);
 typedef NTSTATUS( NTAPI* fnNtTerminateThread)( IN HANDLE ThreadHandle, IN NTSTATUS ExitStatus );
 typedef NTSTATUS( NTAPI* fnExRemoveHandleTable )(IN PHANDLE_TABLE pTable);
 
-#if defined(_WIN8_) || defined (_WIN7_)
-
-typedef NTSTATUS( NTAPI* fnNtProtectVirtualMemory )
-    ( 
-        IN HANDLE ProcessHandle,
-        IN PVOID* BaseAddress,
-        IN SIZE_T* NumberOfBytesToProtect,
-        IN ULONG NewAccessProtection,
-        OUT PULONG OldAccessProtection
-    );
-
-NTSTATUS
-NTAPI
-ZwProtectVirtualMemory(
-    IN HANDLE ProcessHandle,
-    IN OUT PVOID* BaseAddress,
-    IN OUT SIZE_T* NumberOfBytesToProtect,
-    IN ULONG NewAccessProtection,
-    OUT PULONG OldAccessProtection 
-    );
-
-
-#else
 NTSYSAPI
 NTSTATUS
 NTAPI
@@ -260,20 +232,6 @@ ZwProtectVirtualMemory(
     IN ULONG NewAccessProtection,
     OUT PULONG OldAccessProtection
     );
-
-#endif
-
-#ifdef _WIN81_
-
-NTSYSAPI 
-PVOID 
-NTAPI 
-RtlAvlRemoveNode( 
-    IN PRTL_AVL_TREE pTree, 
-    IN PMMADDRESS_NODE pNode 
-    );
-
-#endif
 
 ULONG
 NTAPI

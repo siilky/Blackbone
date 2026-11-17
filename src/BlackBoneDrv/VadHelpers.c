@@ -652,11 +652,7 @@ MiRemoveNode(
     // if the depth of the tree actually decreased.
     //
 
-#if defined( _WIN81_ ) || defined ( _WIN10_ )
     Table->BalancedRoot->u1.Balance = 0;
-#else
-    Table->BalancedRoot.u1.Balance = 0;
-#endif
     P = SANITIZE_PARENT_NODE( EasyDelete->u1.Parent );
 
     //
@@ -686,17 +682,6 @@ MiRemoveNode(
         {
             COUNT_BALANCE_MAX( (SCHAR)-a );
             P->u1.Balance = -a;
-
-            //
-            // If we shortened the depth all the way back to the root, then
-            // the tree really has one less level.
-            //
-
-#if !defined( _WIN81_ ) && !defined ( _WIN10_ )
-            if (Table->BalancedRoot.u1.Balance != 0) {
-                Table->DepthOfTree -= 1;
-            }
-#endif
 
             break;
 
@@ -855,10 +840,8 @@ MiFindNodeOrParent(
         startVpn = VpnCompare->StartingVpn;
         endVpn = VpnCompare->EndingVpn;
 
-#if defined( _WIN81_ ) || defined( _WIN10_ )
         startVpn |= (ULONG_PTR)VpnCompare->StartingVpnHigh << 32;
         endVpn |= (ULONG_PTR)VpnCompare->EndingVpnHigh << 32;
-#endif  
 
         //
         // Compare the buffer with the key in the tree element.

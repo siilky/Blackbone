@@ -10,7 +10,7 @@ jobs:
     name: Build driver
     strategy:
       matrix:
-        configuration: [Win10Release, 'Win8.1 Release', 'Win8 Release', 'Win7 Release']
+        configuration: [Win10Release]
     runs-on: windows-latest
     steps:
       - name: Checkout
