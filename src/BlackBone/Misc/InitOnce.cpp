@@ -5,7 +5,6 @@
 #include <3rd_party/VersionApi.h>
 
 #include "DynImport.h"
-#include "../Symbols/SymbolLoader.h"
 #include "NameResolve.h"
 
 #include <string>
@@ -25,7 +24,10 @@ public:
 
     static bool Exec()
     {
-        if (!_InterlockedCompareExchange( &_done, TRUE, FALSE ))
+        // Magic static: concurrent callers block until the first one finishes, so no thread
+        // sees a partially filled import table. The body must not reenter InitializeOnce,
+        // directly or through DynImport::get, or the initializing thread waits on itself.
+        static const bool done = []
         {
             InitVersion();
 
@@ -33,13 +35,11 @@ public:
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
 
-            SymbolLoader sl;
-            sl.Load( g_symbols );
-
             NameResolve::Instance().Initialize();
-        }
+            return true;
+        }();
 
-        return true;
+        return done;
     }  
 
     /// <summary>
@@ -116,9 +116,6 @@ public:
         LOAD_IMPORT( "GetProcessDEPPolicy",                      hKernel32 );
         LOAD_IMPORT( "QueryFullProcessImageNameW",               hKernel32 );
     }
-
-private:
-    static volatile long _done;
 };
 
 /// <summary>
@@ -127,9 +124,6 @@ private:
 /// <returns>true on initialization completion</returns>
 bool InitializeOnce()
 {
-    // Static flag is still unsafe because of magic statics
     return InitOnce::Exec();
 }
-
-volatile long InitOnce::_done = 0;
 }

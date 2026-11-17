@@ -159,12 +159,12 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
     ptr_t LdrpHandleTlsData = 0;
     if (mod.type == mt_mod64)
     {
-        LdrpHandleTlsData = g_symbols.LdrpHandleTlsData64;
+        LdrpHandleTlsData = GetSymbols().LdrpHandleTlsData64;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE64>( pNode, mod.baseAddress );
     }
     else
     {
-        LdrpHandleTlsData = g_symbols.LdrpHandleTlsData32;
+        LdrpHandleTlsData = GetSymbols().LdrpHandleTlsData32;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE32>( pNode, mod.baseAddress );
     }
 
@@ -231,12 +231,12 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
 /// <returns>true on success</returns>
 bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 { 
-    ptr_t RtlInsertInvertedFunctionTable = g_symbols.RtlInsertInvertedFunctionTable64;
-    ptr_t LdrpInvertedFunctionTable = g_symbols.LdrpInvertedFunctionTable64;
+    ptr_t RtlInsertInvertedFunctionTable = GetSymbols().RtlInsertInvertedFunctionTable64;
+    ptr_t LdrpInvertedFunctionTable = GetSymbols().LdrpInvertedFunctionTable64;
     if (mod.type == mt_mod32)
     {
-        RtlInsertInvertedFunctionTable = g_symbols.RtlInsertInvertedFunctionTable32;
-        LdrpInvertedFunctionTable = g_symbols.LdrpInvertedFunctionTable32;
+        RtlInsertInvertedFunctionTable = GetSymbols().RtlInsertInvertedFunctionTable32;
+        LdrpInvertedFunctionTable = GetSymbols().LdrpInvertedFunctionTable32;
     }
 
     // Invalid addresses. Probably pattern scan has failed
@@ -349,9 +349,9 @@ NTSTATUS NtLdr::UnloadTLS( const NtLdrEntry& mod, bool noThread /*= false*/ )
     if (mod.ldrPtr == 0)
         return STATUS_INVALID_ADDRESS;
 
-    ptr_t LdrpReleaseTlsEntry = g_symbols.LdrpReleaseTlsEntry64;
+    ptr_t LdrpReleaseTlsEntry = GetSymbols().LdrpReleaseTlsEntry64;
     if (mod.type == mt_mod32)
-        LdrpReleaseTlsEntry = g_symbols.LdrpReleaseTlsEntry32;
+        LdrpReleaseTlsEntry = GetSymbols().LdrpReleaseTlsEntry32;
 
     // Not available
     if (LdrpReleaseTlsEntry == 0)

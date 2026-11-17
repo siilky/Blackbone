@@ -22,6 +22,10 @@ struct SymbolData
     ptr_t LdrProtectMrdata = 0;                     // LdrProtectMrdata address
 };
 
-extern SymbolData g_symbols;
+/// <summary>
+/// Ntdll internal pointers, loaded on the first call
+/// </summary>
+/// <returns>Loaded symbols; a field that could not be resolved stays 0</returns>
+const SymbolData& GetSymbols();
 
 }

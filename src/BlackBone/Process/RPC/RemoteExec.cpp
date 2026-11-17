@@ -1,7 +1,6 @@
 #include "RemoteExec.h"
 #include "../Process.h"
 #include "../../Misc/DynImport.h"
-#include "../../Symbols/SymbolData.h"
 
 #include <3rd_party/VersionApi.h>
 #include <sddl.h>

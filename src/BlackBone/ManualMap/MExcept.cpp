@@ -284,7 +284,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         if (!pDecode)
             return pDecode.status;
 
-        auto pProtect = static_cast<uint32_t>(g_symbols.LdrProtectMrdata);
+        auto pProtect = static_cast<uint32_t>(GetSymbols().LdrProtectMrdata);
         if (pProtect != 0)
         {
             auto adapter = AsmFactory::GetAssembler( AsmFactory::asm32 );
@@ -306,7 +306,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
             pProtect = static_cast<uint32_t>(_pVEHCode.ptr() + handlerSize);
         }
 
-        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(g_symbols.LdrpInvertedFunctionTable32) );
+        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(GetSymbols().LdrpInvertedFunctionTable32) );
         replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
         replaceStub( newHandler, handlerSize, 0xDEADC0D2, pProtect );
     }
