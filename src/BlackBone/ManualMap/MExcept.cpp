@@ -281,11 +281,24 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         handlerSize = sizeof( _handler32 );
         memcpy( newHandler, _handler32, handlerSize );
 
+        // Required for the x86 handler; resolve before writing anything into the stub
+        auto invertedTable = GetSymbolAddress( mods, GetSymbols().LdrpInvertedFunctionTable32, mod.type );
+        if (!invertedTable)
+        {
+            _pVEHCode.Free();
+            return invertedTable.status;
+        }
+
         auto pDecode = mods.GetNtdllExport( "RtlDecodeSystemPointer", mod.type, Sections );
         if (!pDecode)
+        {
+            _pVEHCode.Free();
             return pDecode.status;
+        }
 
-        auto pProtect = static_cast<uint32_t>(GetSymbols().LdrProtectMrdata);
+        // Optional: a missing LdrProtectMrdata skips the write-enable adapter
+        auto protectMrdata = GetSymbolAddress( mods, GetSymbols().LdrProtectMrdata, mod.type );
+        uint32_t pProtect = protectMrdata ? static_cast<uint32_t>(protectMrdata.result()) : 0;
         if (pProtect != 0)
         {
             auto adapter = AsmFactory::GetAssembler( AsmFactory::asm32 );
@@ -307,7 +320,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
             pProtect = static_cast<uint32_t>(_pVEHCode.ptr() + handlerSize);
         }
 
-        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(GetSymbols().LdrpInvertedFunctionTable32) );
+        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(invertedTable.result()) );
         replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
         replaceStub( newHandler, handlerSize, 0xDEADC0D2, pProtect );
     }
@@ -322,7 +335,10 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     // AddVectoredExceptionHandler(0, pHandler);
     auto pAddHandler = mods.GetNtdllExport( "RtlAddVectoredExceptionHandler", mod.type, Sections );
     if (!pAddHandler)
+    {
+        _pVEHCode.Free();
         return pAddHandler.status;
+    }
 
     auto a = AsmFactory::GetAssembler( mod.type );
 
@@ -339,8 +355,8 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     }
     else
     {
-        status = proc.remote().GetLastStatus();
-        return status;
+        _pVEHCode.Free();
+        return NT_SUCCESS( status ) ? proc.remote().GetLastStatus() : status;
     }
 }
 

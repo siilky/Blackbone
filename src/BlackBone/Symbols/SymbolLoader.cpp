@@ -1,13 +1,47 @@
 #include "SymbolLoader.h"
 #include "PDBHelper.h"
-#include "../Symbols/PatternLoader.h"
+#include "../Misc/Trace.hpp"
+#include "../Misc/Utils.h"
 #include "../PE/PEImage.h"
 
 namespace blackbone
 {
 
-SymbolLoader::SymbolLoader() 
-    : _x86OS( false )
+/// <summary>
+/// Load the symbols of one ntdll bitness
+/// </summary>
+/// <param name="pdb">Initialized PDB of the ntdll image</param>
+static void LoadNtdllSymbols( PDBHelper& pdb, uint32_t& handleTlsData, uint32_t& invertedFunctionTable,
+                              uint32_t& insertInvertedFunctionTable, uint32_t& releaseTlsEntry )
+{
+    pdb.GetSymAddress( L"LdrpHandleTlsData", handleTlsData );
+
+    // Recent ntdll PDBs use the plural name for the inverted function tables.
+    if (FAILED( pdb.GetSymAddress( L"LdrpInvertedFunctionTable", invertedFunctionTable ) ))
+        pdb.GetSymAddress( L"LdrpInvertedFunctionTables", invertedFunctionTable );
+
+    pdb.GetSymAddress( L"RtlInsertInvertedFunctionTable", insertInvertedFunctionTable );
+    pdb.GetSymAddress( L"LdrpReleaseTlsEntry", releaseTlsEntry );
+}
+
+/// <summary>
+/// Map a PDBHelper::Init failure to the loading status
+/// </summary>
+static NTSTATUS StatusFromPdb( HRESULT hr )
+{
+    if (hr == HRESULT_FROM_WIN32( ERROR_MOD_NOT_FOUND ))
+        return STATUS_DLL_NOT_FOUND;
+
+    if (hr == E_PDB_NOT_FOUND)
+        return STATUS_NO_SUCH_FILE;
+
+    BLACKBONE_TRACE( "PDB: loading failed with HRESULT 0x%08x", hr );
+    return STATUS_UNSUCCESSFUL;
+}
+
+SymbolLoader::SymbolLoader( bool allowNetwork )
+    : _allowNetwork( allowNetwork )
+    , _x86OS( false )
     , _wow64Process( false )
 {
     SYSTEM_INFO info = { };
@@ -25,101 +59,64 @@ SymbolLoader::SymbolLoader()
     }
 }
 
-/// <summary>
-/// Load symbol addresses from PDB or and pattern scans
-/// </summary>
-/// <param name="result">Found symbols</param>
-/// <returns>Status code</returns>
 NTSTATUS SymbolLoader::Load( SymbolData& result )
 {
-    auto [ntdll32, ntdll64] = LoadImages();
-
-    // Get addresses from pdb
-    LoadFromSymbols( ntdll32, ntdll64, result );
-   
-    // Fill missing symbols from patterns
-    return LoadFromPatterns( ntdll32, ntdll64, result );
-}
-
-/// <summary>
-/// Load symbol addresses from PDBs
-/// </summary>
-/// <param name="ntdll32">Loaded x86 ntdll image</param>
-/// <param name="ntdll64">Loaded x64 ntdll image</param>
-/// <param name="result">Found symbols</param>
-/// <returns>Status code</returns>
-NTSTATUS SymbolLoader::LoadFromSymbols( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result )
-{
-    PDBHelper sym32, sym64;
-    HRESULT hr = sym32.Init( ntdll32.path(), ntdll32.imageBase() );
-    if (!_x86OS && SUCCEEDED( hr ))
-    {
-        FsRedirector fsr( _wow64Process );
-        hr = sym64.Init( ntdll64.path(), ntdll64.imageBase() );
-    }
-
-    if (SUCCEEDED( hr ))
-    {
-        sym32.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData32 );
-        sym64.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData64 );
-
-        // Recent ntdll PDBs use the plural name for the inverted function tables.
-        if (FAILED( sym32.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable32 ) ))
-            sym32.GetSymAddress( L"LdrpInvertedFunctionTables", result.LdrpInvertedFunctionTable32 );
-        if (FAILED( sym64.GetSymAddress( L"LdrpInvertedFunctionTable", result.LdrpInvertedFunctionTable64 ) ))
-            sym64.GetSymAddress( L"LdrpInvertedFunctionTables", result.LdrpInvertedFunctionTable64 );
-
-        sym32.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable32 );
-        sym64.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable64 );
-
-        sym32.GetSymAddress( L"LdrpReleaseTlsEntry", result.LdrpReleaseTlsEntry32 );
-        sym64.GetSymAddress( L"LdrpReleaseTlsEntry", result.LdrpReleaseTlsEntry64 );
-
-        sym32.GetSymAddress( L"LdrProtectMrdata", result.LdrProtectMrdata );
-
-        return STATUS_SUCCESS;
-    }
-
-    return STATUS_UNSUCCESSFUL;
-}
-
-/// <summary>
-/// Load symbol addresses from pattern scans
-/// </summary>
-/// <param name="ntdll32">Loaded x86 ntdll image</param>
-/// <param name="ntdll64">Loaded x64 ntdll image</param>
-/// <param name="result">Found symbols</param>
-/// <returns>Status code</returns>
-NTSTATUS SymbolLoader::LoadFromPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result )
-{
-    return ScanSymbolPatterns( ntdll32, ntdll64, result );
-}
-
-/// <summary>
-/// Load ntdll images from the disk
-/// </summary>
-/// <returns>Loaded x86 and x64 ntdll</returns>
-std::pair<pe::PEImage, pe::PEImage> SymbolLoader::LoadImages()
-{
+    // Images come from the disk: the symbols are looked up by file, not in a running process
     pe::PEImage ntdll32, ntdll64;
 
     wchar_t buf[MAX_PATH] = { 0 };
     GetWindowsDirectoryW( buf, MAX_PATH );
     std::wstring windir( buf );
 
+    NTSTATUS status = STATUS_SUCCESS;
     if (_x86OS)
     {
-        ntdll32.Load( std::wstring( windir + L"\\System32\\ntdll.dll" ), true );
+        status = ntdll32.Load( std::wstring( windir + L"\\System32\\ntdll.dll" ), true );
     }
     else
     {
         FsRedirector fsr( _wow64Process );
 
-        ntdll64.Load( std::wstring( windir + L"\\System32\\ntdll.dll" ), true );
-        ntdll32.Load( std::wstring( windir + L"\\SysWOW64\\ntdll.dll" ), true );
+        status = ntdll64.Load( std::wstring( windir + L"\\System32\\ntdll.dll" ), true );
+        if (NT_SUCCESS( status ))
+            status = ntdll32.Load( std::wstring( windir + L"\\SysWOW64\\ntdll.dll" ), true );
     }
 
-    return std::make_pair( std::move( ntdll32 ), std::move( ntdll64 ) );
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    // A failed architecture does not prevent filling the other one; the first failure is reported
+    PDBHelper sym32( _allowNetwork );
+    HRESULT hr = sym32.Init( ntdll32.path() );
+    if (SUCCEEDED( hr ))
+    {
+        LoadNtdllSymbols( sym32, result.LdrpHandleTlsData32, result.LdrpInvertedFunctionTable32,
+                          result.RtlInsertInvertedFunctionTable32, result.LdrpReleaseTlsEntry32 );
+        sym32.GetSymAddress( L"LdrProtectMrdata", result.LdrProtectMrdata );
+    }
+    else
+    {
+        status = StatusFromPdb( hr );
+    }
+
+    if (!_x86OS)
+    {
+        FsRedirector fsr( _wow64Process );
+
+        PDBHelper sym64( _allowNetwork );
+        hr = sym64.Init( ntdll64.path() );
+        if (SUCCEEDED( hr ))
+        {
+            LoadNtdllSymbols( sym64, result.LdrpHandleTlsData64, result.LdrpInvertedFunctionTable64,
+                              result.RtlInsertInvertedFunctionTable64, result.LdrpReleaseTlsEntry64 );
+        }
+        else if (NT_SUCCESS( status ))
+        {
+            status = StatusFromPdb( hr );
+        }
+    }
+
+    return status;
 }
 
 }

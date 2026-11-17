@@ -15,5 +15,6 @@ enum InitOptions
 /// construction and dynamic imports call it with the defaults, so a caller that needs other
 /// options must call it before using the library.
 /// </summary>
+/// <returns>true if the effective options equal the requested ones</returns>
 BLACKBONE_API bool InitializeOnce( InitOptions options = All );
 }

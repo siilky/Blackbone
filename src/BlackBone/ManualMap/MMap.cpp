@@ -7,11 +7,6 @@
 #include "../DriverControl/DriverControl.h"
 
 #include <random>
-#include <3rd_party/VersionApi.h>
-
-#ifndef STATUS_INVALID_EXCEPTION_HANDLER
-#define STATUS_INVALID_EXCEPTION_HANDLER ((NTSTATUS)0xC00001A5L)
-#endif
 
 namespace blackbone
 {
@@ -445,7 +440,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     // Make exception handling possible (C and C++)
     if (!(flags & NoExceptions))
     {
-        if (!NT_SUCCESS( status = EnableExceptions( pImage ) ) && status != STATUS_NOT_FOUND)
+        if (!NT_SUCCESS( status = EnableExceptions( pImage ) ))
         {
             BLACKBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", ldrEntry.name.c_str() );
             pImage->peImage.Release();
@@ -495,6 +490,13 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     if (!(flags & NoTLS) && !NT_SUCCESS( status = InitStaticTLS( pImage ) ))
     {
         BLACKBONE_TRACE( L"ManualMap: Failed to initialize static TLS for image %ls, status 0x%X", ldrEntry.name.c_str(), status );
+
+        // The image is dropped, so its exception registration must not outlive it: the
+        // handler would keep using the module table that MExcept::reset frees later.
+        // Needs peImage, so it runs before Release; the TLS status is the one reported.
+        if (!(flags & NoExceptions))
+            DisableExceptions( pImage );
+
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( ldrEntry.name, mt );
         return status;
@@ -520,6 +522,12 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
 /// <returns>Status code</returns>
 NTSTATUS MMap::UnmapAllModules()
 {
+    // Cleanup runs to the end for every image; the first static TLS release failure is
+    // reported. Only images whose static TLS entry was registered are released, so images
+    // without static TLS never load symbols. A missing loader pointer
+    // (STATUS_INVALID_ADDRESS) is not an error.
+    NTSTATUS result = STATUS_SUCCESS;
+
     for (auto img = _images.rbegin(); img != _images.rend(); ++img)
     {
         auto pImage = *img;
@@ -532,7 +540,12 @@ NTSTATUS MMap::UnmapAllModules()
         if (!(pImage->flags & NoExceptions))
             DisableExceptions( pImage );
 
-        _process.nativeLdr().UnloadTLS( pImage->ldrEntry );
+        if (pImage->staticTls)
+        {
+            NTSTATUS tlsStatus = _process.nativeLdr().UnloadTLS( pImage->ldrEntry );
+            if (!NT_SUCCESS( tlsStatus ) && tlsStatus != STATUS_INVALID_ADDRESS && NT_SUCCESS( result ))
+                result = tlsStatus;
+        }
 
         // Remove from loader
         if (pImage->ldrEntry.flags != Ldr_None)
@@ -543,10 +556,10 @@ NTSTATUS MMap::UnmapAllModules()
 
         // Remove reference from local modules list
         _process.modules().RemoveManualModule( pImage->ldrEntry.name, pImage->peImage.mType() );
-    } 
+    }
 
     Cleanup();
-    return STATUS_SUCCESS;
+    return result;
 }
 
 /// <summary>
@@ -971,7 +984,8 @@ NTSTATUS MMap::EnableExceptions( ImageContextPtr pImage )
 {
     BLACKBONE_TRACE( L"ManualMap: Enabling exception support for image '%ls'", pImage->ldrEntry.name.c_str() );
     bool partial = (pImage->flags & PartialExcept) != 0;
-    bool success = _process.nativeLdr().InsertInvertedFunctionTable( pImage->ldrEntry );
+    NTSTATUS tableStatus = _process.nativeLdr().InsertInvertedFunctionTable( pImage->ldrEntry );
+    bool success = NT_SUCCESS( tableStatus );
 
     if (pImage->ldrEntry.type == mt_mod64)
     {
@@ -1008,13 +1022,13 @@ NTSTATUS MMap::EnableExceptions( ImageContextPtr pImage )
                 if (!NT_SUCCESS( status ))
                     return status;
             }
-            // No exception table
+            // No exception table, nothing to register
             else
-                return STATUS_NOT_FOUND;
+                return STATUS_SUCCESS;
         }
     }
     else if (!success)
-        return STATUS_INVALID_EXCEPTION_HANDLER;
+        return tableStatus;
 
     // Custom handler not required
     if (pImage->ldrEntry.safeSEH || (pImage->ldrEntry.type == mt_mod64 && (pImage->flags & CreateLdrRef || success)))
@@ -1074,7 +1088,9 @@ NTSTATUS MMap::InitStaticTLS( ImageContextPtr pImage )
     if (pTls && pTls->AddressOfIndex)
     {
         BLACKBONE_TRACE( L"ManualMap: Performing static TLS initialization for image '%ls'", pImage->ldrEntry.name.c_str() );
-        return _process.nativeLdr().AddStaticTLSEntry( pImage->ldrEntry, rebasedTlsPtr );
+        NTSTATUS status = _process.nativeLdr().AddStaticTLSEntry( pImage->ldrEntry, rebasedTlsPtr );
+        pImage->staticTls = NT_SUCCESS( status );
+        return status;
     }
 
     return STATUS_SUCCESS;

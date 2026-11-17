@@ -26,7 +26,7 @@ public:
         // Magic static: concurrent callers block until the first one finishes, so no thread
         // sees a partially filled import table. The body must not reenter InitializeOnce,
         // directly or through DynImport::get, or the initializing thread waits on itself.
-        static const bool done = [options]
+        static const InitOptions effective = [options]
         {
             InitVersion();
 
@@ -37,10 +37,10 @@ public:
             }
 
             LoadFuncs();
-            return true;
+            return options;
         }();
 
-        return done;
+        return options == effective;
     }  
 
     /// <summary>
@@ -122,7 +122,7 @@ public:
 /// Exported InitOnce wrapper
 /// </summary>
 /// <param name="options">Initialization options, effective only on the first call</param>
-/// <returns>true on initialization completion</returns>
+/// <returns>true if the effective options equal the requested ones</returns>
 bool InitializeOnce( InitOptions options )
 {
     return InitOnce::Exec( options );

@@ -4,48 +4,24 @@
 namespace blackbone
 {
 
-namespace pe
-{
-    class PEImage;
-}
-
 class SymbolLoader
 {
 public:
-    BLACKBONE_API SymbolLoader();
+    /// <summary>
+    /// Loader of ntdll symbols from PDBs
+    /// </summary>
+    /// <param name="allowNetwork">Allow downloading PDBs from the symbol server</param>
+    BLACKBONE_API explicit SymbolLoader( bool allowNetwork );
 
     /// <summary>
-    /// Load symbol addresses from PDB or and pattern scans
+    /// Load symbol RVAs of the native ntdll images
     /// </summary>
-    /// <param name="result">Found symbols</param>
-    /// <returns>Status code</returns>
+    /// <param name="result">Found symbols; a symbol that could not be resolved stays 0</param>
+    /// <returns>Loading status</returns>
     BLACKBONE_API NTSTATUS Load( SymbolData& result );
 
-    /// <summary>
-    /// Load symbol addresses from PDBs
-    /// </summary>
-    /// <param name="ntdll32">Loaded x86 ntdll image</param>
-    /// <param name="ntdll64">Loaded x64 ntdll image</param>
-    /// <param name="result">Found symbols</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS LoadFromSymbols( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result );
-
-    /// <summary>
-    /// Load symbol addresses from pattern scans
-    /// </summary>
-    /// <param name="ntdll32">Loaded x86 ntdll image</param>
-    /// <param name="ntdll64">Loaded x64 ntdll image</param>
-    /// <param name="result">Found symbols</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS LoadFromPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result );
-
-    /// <summary>
-    /// Load ntdll images from the disk
-    /// </summary>
-    /// <returns>Loaded x86 and x64 ntdll</returns>
-    BLACKBONE_API std::pair<pe::PEImage, pe::PEImage> LoadImages();
-
 private:
+    bool _allowNetwork;     // Symbol server access
     bool _x86OS;            // x86 OS
     bool _wow64Process;     // Current process is wow64 process
 };

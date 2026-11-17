@@ -5,6 +5,9 @@ namespace Testing
     TEST_MODULE_INITIALIZE( ModuleInit )
     {
         InitializeOnce();
+
+        // Manual mapping needs ntdll symbols; the run allows the symbol server once for all tests
+        LoadSymbols( true );
     }
 
     TEST_CLASS( Generic )
@@ -13,6 +16,13 @@ namespace Testing
         TEST_METHOD_INITIALIZE( ClassInitialize )
         {
             AssertEx::NtSuccess( _proc.Attach( GetCurrentProcessId() ) );
+        }
+
+        TEST_METHOD( InitializeOnceOptions )
+        {
+            // Module initialization fixed the default options for the process
+            AssertEx::IsTrue( InitializeOnce() );
+            AssertEx::IsFalse( InitializeOnce( None ) );
         }
 
         TEST_METHOD( PEB )

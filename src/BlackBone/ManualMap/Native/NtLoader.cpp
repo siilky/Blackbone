@@ -147,15 +147,15 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
     ptr_t pNode = _nodeMap.count( mod.baseAddress ) ? _nodeMap[mod.baseAddress] : 0;
 
     // Allocate appropriate structure
-    ptr_t LdrpHandleTlsData = 0;
+    uint32_t LdrpHandleTlsDataRva = 0;
     if (mod.type == mt_mod64)
     {
-        LdrpHandleTlsData = GetSymbols().LdrpHandleTlsData64;
+        LdrpHandleTlsDataRva = GetSymbols().LdrpHandleTlsData64;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE64>( pNode, mod.baseAddress );
     }
     else
     {
-        LdrpHandleTlsData = GetSymbols().LdrpHandleTlsData32;
+        LdrpHandleTlsDataRva = GetSymbols().LdrpHandleTlsData32;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE32>( pNode, mod.baseAddress );
     }
 
@@ -167,24 +167,23 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
         mod.ldrPtr = pNode;
 
     // Use native method
-    if (LdrpHandleTlsData)
-    {
-        auto a = AsmFactory::GetAssembler( mod.type );
-        uint64_t result = 0;
+    auto LdrpHandleTlsData = GetSymbolAddress( _process.modules(), LdrpHandleTlsDataRva, mod.type );
+    if (!LdrpHandleTlsData)
+        return LdrpHandleTlsData.status;
 
-        a->GenPrologue();
-        a->GenCall( LdrpHandleTlsData, { pNode }, cc_thiscall );
-        _process.remote().AddReturnWithEvent( *a );
-        a->GenEpilogue();
+    auto a = AsmFactory::GetAssembler( mod.type );
+    uint64_t result = 0;
 
-        auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
-        if (!NT_SUCCESS( status ))
-            return status;
+    a->GenPrologue();
+    a->GenCall( LdrpHandleTlsData.result(), { pNode }, cc_thiscall );
+    _process.remote().AddReturnWithEvent( *a );
+    a->GenEpilogue();
 
-        return static_cast<NTSTATUS>(result);
-    }
-    else
-        return STATUS_ORDINAL_NOT_FOUND;
+    auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    return static_cast<NTSTATUS>(result);
 }
 
 
@@ -193,22 +192,29 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
 /// Used to create fake SAFESEH entries
 /// </summary>
 /// <param name="mod">Module data</param>
-/// <returns>true on success</returns>
-bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
-{ 
-    ptr_t RtlInsertInvertedFunctionTable = GetSymbols().RtlInsertInvertedFunctionTable64;
-    ptr_t LdrpInvertedFunctionTable = GetSymbols().LdrpInvertedFunctionTable64;
+/// <returns>Status code</returns>
+NTSTATUS NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
+{
+    uint32_t RtlInsertInvertedFunctionTableRva = GetSymbols().RtlInsertInvertedFunctionTable64;
+    uint32_t LdrpInvertedFunctionTableRva = GetSymbols().LdrpInvertedFunctionTable64;
     if (mod.type == mt_mod32)
     {
-        RtlInsertInvertedFunctionTable = GetSymbols().RtlInsertInvertedFunctionTable32;
-        LdrpInvertedFunctionTable = GetSymbols().LdrpInvertedFunctionTable32;
+        RtlInsertInvertedFunctionTableRva = GetSymbols().RtlInsertInvertedFunctionTable32;
+        LdrpInvertedFunctionTableRva = GetSymbols().LdrpInvertedFunctionTable32;
     }
 
-    // Invalid addresses. Probably pattern scan has failed
-    if (RtlInsertInvertedFunctionTable == 0 || LdrpInvertedFunctionTable == 0)
-        return false;
+    auto insertFn = GetSymbolAddress( _process.modules(), RtlInsertInvertedFunctionTableRva, mod.type );
+    if (!insertFn)
+        return insertFn.status;
 
-    auto InsertP = [&]( auto table )
+    auto invertedTable = GetSymbolAddress( _process.modules(), LdrpInvertedFunctionTableRva, mod.type );
+    if (!invertedTable)
+        return invertedTable.status;
+
+    ptr_t RtlInsertInvertedFunctionTable = insertFn.result();
+    ptr_t LdrpInvertedFunctionTable = invertedTable.result();
+
+    auto InsertP = [&]( auto table ) -> NTSTATUS
     {
         uint64_t result = 0;
         auto a = AsmFactory::GetAssembler( mod.type );
@@ -217,7 +223,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
         memory.Read( LdrpInvertedFunctionTable, sizeof( table ), &table );
         for (ULONG i = 0; i < table.Count; i++)
             if (table.Entries[i].ImageBase == mod.baseAddress)
-                return true;
+                return STATUS_SUCCESS;
 
         a->GenPrologue();
 
@@ -236,7 +242,10 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 
             // If Image has SAFESEH, RtlInsertInvertedFunctionTable is enough
             if (table.Entries[i].SizeOfTable != 0)
-                return mod.safeSEH = true;
+            {
+                mod.safeSEH = true;
+                return STATUS_SUCCESS;
+            }
 
             //
             // Create fake Exception directory
@@ -246,7 +255,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
             // Allocate memory for 2048 possible handlers
             auto mem = memory.Allocate( sizeof( DWORD ) * 0x800, PAGE_READWRITE, 0, false );
             if (!mem)
-                return false;
+                return mem.status;
 
             // EncodeSystemPointer( mem->ptr() )
             uint32_t size = 0;
@@ -275,10 +284,10 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
             auto status = memory.Write( LdrpInvertedFunctionTable + field_ofst, size, &pEncoded );
             memory.Protect( LdrpInvertedFunctionTable + field_ofst, sizeof( ptr_t ), flOld, &flOld );
 
-            return NT_SUCCESS( status );
+            return status;
         }
 
-        return false;
+        return STATUS_NOT_FOUND;
     };
 
     if (mod.type == mt_mod64)
@@ -299,19 +308,19 @@ NTSTATUS NtLdr::UnloadTLS( const NtLdrEntry& mod, bool noThread /*= false*/ )
     if (mod.ldrPtr == 0)
         return STATUS_INVALID_ADDRESS;
 
-    ptr_t LdrpReleaseTlsEntry = GetSymbols().LdrpReleaseTlsEntry64;
+    uint32_t LdrpReleaseTlsEntryRva = GetSymbols().LdrpReleaseTlsEntry64;
     if (mod.type == mt_mod32)
-        LdrpReleaseTlsEntry = GetSymbols().LdrpReleaseTlsEntry32;
+        LdrpReleaseTlsEntryRva = GetSymbols().LdrpReleaseTlsEntry32;
 
-    // Not available
-    if (LdrpReleaseTlsEntry == 0)
-        return STATUS_ORDINAL_NOT_FOUND;
+    auto LdrpReleaseTlsEntry = GetSymbolAddress( _process.modules(), LdrpReleaseTlsEntryRva, mod.type );
+    if (!LdrpReleaseTlsEntry)
+        return LdrpReleaseTlsEntry.status;
 
     auto a = AsmFactory::GetAssembler( mod.type );
     uint64_t result = 0;
 
     a->GenPrologue();
-    a->GenCall( LdrpReleaseTlsEntry, { mod.ldrPtr, 0 }, cc_fastcall );
+    a->GenCall( LdrpReleaseTlsEntry.result(), { mod.ldrPtr, 0 }, cc_fastcall );
 
     _process.remote().AddReturnWithEvent( *a );
     a->GenEpilogue();

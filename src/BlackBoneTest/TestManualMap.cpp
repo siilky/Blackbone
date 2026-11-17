@@ -91,6 +91,9 @@ namespace Testing
             AssertEx::NtSuccess( g_loadData.status );
 
             ValidateDllLoad( g_loadData.result() );
+
+            // The helper DLL has static TLS, so unmapping includes the loader TLS release step
+            AssertEx::NtSuccess( proc.mmap().UnmapAllModules() );
         }
 
         void MapFromMemory( const std::wstring& hostPath, const std::wstring& dllPath )

@@ -62,8 +62,8 @@ public:
     /// Used to create fake SAFESEH entries
     /// </summary>
     /// <param name="mod">Module data</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool InsertInvertedFunctionTable( NtLdrEntry& mod );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS InsertInvertedFunctionTable( NtLdrEntry& mod );
 
     /// <summary>
     /// Free static TLS

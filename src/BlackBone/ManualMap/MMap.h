@@ -157,6 +157,7 @@ struct ImageContext
     ptr_t          pExpTableAddr = 0;       // Exception table address (amd64 only)
     eLoadFlags     flags = NoFlags;         // Image loader flags
     bool           initialized = false;     // Image entry point was called
+    bool           staticTls = false;       // Static TLS entry registered with the native loader
 };
 
 using ImageContextPtr = std::shared_ptr<ImageContext>;

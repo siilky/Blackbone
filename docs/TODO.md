@@ -30,6 +30,18 @@
 - **Action**: propagate the status from every `ExecInWorkerThread` call in these components, and either create the environment they need or document the precondition on their public entry points.
 - **Done when**: each such call path returns or logs its failure status; covered by a test that calls an `NtLdr` operation without a prior manual map.
 
+## Keep one exception handler per mapped image in `MExcept`
+
+- **Problem**: `MExcept` holds a single `_pVEHCode` and `_hVEH`. Each non-partial `CreateVEH` (one per mapped image that needs the vectored handler, for example several x86 images without SafeSEH in one `MMap`) allocates a new handler and overwrites both members without removing the previous one, so `RemoveVEH` removes only the last handler and the earlier ones stay registered in the target over code that unmapping frees.
+- **Action**: either share one handler per `MMap` (the x64 handler already reads a module table) or keep the handler per image in `ImageContext`, and remove every registered handler on unmap and on mapping failure.
+- **Done when**: mapping two images that each need the vectored handler and unmapping them leaves no handler registered; covered by a test on x86 and x64 targets.
+
+## Remove manually mapped images from the inverted function table
+
+- **Problem**: `NtLdr::InsertInvertedFunctionTable` adds every mapped image that gets exception support to the target's `LdrpInvertedFunctionTable(s)` through `RtlInsertInvertedFunctionTable`, for x86 and x64 images. Nothing removes the entry: `MMap::DisableExceptions` only deletes the x64 `RtlAddFunctionTable` registration (and returns early when the image was inserted into the inverted table instead) and removes the vectored handler, both on `UnmapAllModules` and when static TLS initialization fails after exceptions were enabled. The stale entry describes freed memory, so an exception raised later at an address reused in that range is dispatched with the unmapped image's exception data, and the entry keeps occupying one of the table's `MaxCount` slots.
+- **Action**: remove the entry when the image is unmapped or its mapping fails after insertion, only for images whose insertion succeeded. Use an ntdll removal routine resolved through the ntdll symbol sources like the insertion routine, with the same bitness handling and statuses; recent ntdll PDBs name it `RtlxRemoveInvertedFunctionTable` (with `RtlpRemoveInvertedFunctionTableEntry` below it), so confirm the name and calling convention for each supported build.
+- **Done when**: after mapping and unmapping an image with exception support, the target's inverted function table no longer lists it, on x86 and x64 targets from both host architectures; covered by a test.
+
 ## Build the driver with the current WDK
 
 - **Problem**: with WDK 10.0.28000 and the Visual Studio 18 toolset, `src/BlackBoneDrv/BlackBoneDrv.sln` (`Win10Release`) fails before producing a signed driver. The project compiles with `/WX`, which turns new warnings into errors: `C4996` for every `ExAllocatePoolWithTag` call (deprecated in favor of `ExAllocatePool2`) and `C5286`/`C5287` for implicit conversions between the `_MmapFlags` and `KMmapFlags` enums in `MMap.c`. `Win10Debug` also enables `/sdl`, which makes `C4996` an error even without `/WX`. With `/WX` disabled (and, for `Win10Debug`, `C4996` suppressed), compilation and linking succeed, but the test-signing step fails because the current `SignTool` requires an explicit file digest algorithm (`/fd`), which the project does not set.
