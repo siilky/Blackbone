@@ -282,7 +282,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         memcpy( newHandler, _handler32, handlerSize );
 
         // Required for the x86 handler; resolve before writing anything into the stub
-        auto invertedTable = GetSymbolAddress( mods, GetSymbols().LdrpInvertedFunctionTable32, mod.type );
+        auto invertedTable = GetSymbolAddress( proc, GetSymbols().LdrpInvertedFunctionTable32, mod.type );
         if (!invertedTable)
         {
             _pVEHCode.Free();
@@ -297,7 +297,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         }
 
         // Optional: a missing LdrProtectMrdata skips the write-enable adapter
-        auto protectMrdata = GetSymbolAddress( mods, GetSymbols().LdrProtectMrdata, mod.type );
+        auto protectMrdata = GetSymbolAddress( proc, GetSymbols().LdrProtectMrdata, mod.type );
         uint32_t pProtect = protectMrdata ? static_cast<uint32_t>(protectMrdata.result()) : 0;
         if (pProtect != 0)
         {

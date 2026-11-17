@@ -15,9 +15,21 @@ The activation prints `'vswhere.exe' is not recognized`; that line is harmless. 
 
 Run one build or VSTest process at a time per build directory: a build rewrites `build/<arch>-<preset>/`, and a test run loads the DLLs from it. Different architectures and presets use separate directories. Run each build or test as one call whose timeout covers it.
 
-The `Symbols` tests and manual mapping require matching PDBs for the installed x86 and x64 `ntdll.dll`. The test module allows the network once ([ADR 0003](../adr/0003-symbols-network-on-request.md)), so the default search downloads them from Microsoft's symbol server into `%TEMP%\Symbols`; an explicit `_NT_SYMBOL_PATH` selects the symbol search environment instead. The library passes the current `_NT_SYMBOL_PATH` to DIA explicitly, but DIA also searches the value the process started with, so changing the variable in a test adds stores to the search without removing the original ones. A PDB-loading failure fails `SymbolsMatch`, which names each missing symbol, so check symbol access before attributing a mapping failure to the code. Symbol compatibility must be checked against the installed `ntdll` files, whose version can differ from the OS build.
+The `Symbols` tests require the fingerprint catalog ([ADR 0004](../adr/0004-ntdll-fingerprint-catalog.md)) to cover the installed x86 and x64 `ntdll.dll` and matching PDBs for them; after a Windows update, [regenerate the catalog](#regenerate-the-symbol-catalog) before treating a `SymbolsMatch` failure as a code defect. The test module allows the network once ([ADR 0003](../adr/0003-symbols-network-on-request.md)), so the default search downloads the PDBs from Microsoft's symbol server into `%TEMP%\Symbols`; an explicit `_NT_SYMBOL_PATH` selects the symbol search environment instead. The library passes the current `_NT_SYMBOL_PATH` to DIA explicitly, but DIA also searches the value the process started with, so changing the variable in a test adds stores to the search without removing the original ones. A PDB-loading failure fails `SymbolsMatch`, which names each missing symbol, so check symbol access before attributing a mapping failure to the code. Symbol compatibility must be checked against the installed `ntdll` files, whose version can differ from the OS build.
 
 Pattern scans use private x64 helpers with known bytes, including when the test host is x86; window-search tests create their own hidden window. The default run with driver-dependent tests skipped does not require Explorer, but still requires access to create processes, remote threads, debug events, and windows. If a restricted execution environment changes those operations, repeat the same focused VSTest invocation in a normal user session before classifying a repository failure. Driver-dependent tests remain opt-in through the build script and still require Explorer.
+
+### Regenerate the symbol catalog
+
+`SymbolCatalogGen` rebuilds `src/BlackBone/Symbols/SymbolCatalogData.cpp` from its inputs only; it does not merge with the existing table, so every build the catalog should keep covering must be an input. It builds in the static presets and finds PDBs only in local stores (`%TEMP%\symbols` and `srv*` stores of `_NT_SYMBOL_PATH`). From the repository root, after building `build/x64-static-mt`:
+
+```powershell
+./scripts/Get-NtdllBuilds.ps1 -Store <store>
+$env:_NT_SYMBOL_PATH = "srv*<store>"
+build/x64-static-mt/Release/SymbolCatalogGen.exe src/BlackBone/Symbols/SymbolCatalogData.cpp <store>\ntdll.dll C:\Windows\System32\ntdll.dll C:\Windows\SysWOW64\ntdll.dll
+```
+
+The download is the only step that uses the network; `Get-Help ./scripts/Get-NtdllBuilds.ps1 -Detailed` owns its parameters. In the diff, check the `covers` comments for builds that dropped out, and review the calling convention of each new entry before committing ([ADR 0004](../adr/0004-ntdll-fingerprint-catalog.md), decision 4).
 
 ## Local environment
 

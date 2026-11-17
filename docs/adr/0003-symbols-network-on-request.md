@@ -1,6 +1,6 @@
 # Ntdll symbols use the network only on request
 
-Status: accepted.
+Status: accepted; decisions 1 and 6 are amended by [ADR 0004](0004-ntdll-fingerprint-catalog.md), which adds the fingerprint catalog as the first source and a check that the target's ntdll is the file the RVAs come from.
 
 ## Context
 

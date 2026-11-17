@@ -28,4 +28,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>)
 
 add_subdirectory(BlackBone)
 add_subdirectory(Samples)
+if(NOT BUILD_SHARED_LIBS)
+    add_subdirectory(SymbolCatalogGen)
+endif()
 add_subdirectory(BlackBoneTest)

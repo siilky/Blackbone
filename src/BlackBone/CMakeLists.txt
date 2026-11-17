@@ -48,6 +48,8 @@ add_library(BlackBone
     Process/Threads/Threads.cpp
     Subsystem/NativeSubsystem.cpp
     Symbols/PDBHelper.cpp
+    Symbols/SymbolCatalog.cpp
+    Symbols/SymbolCatalogData.cpp
     Symbols/SymbolData.cpp
     Symbols/SymbolLoader.cpp)
 

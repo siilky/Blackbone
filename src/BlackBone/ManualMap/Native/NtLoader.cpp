@@ -167,7 +167,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
         mod.ldrPtr = pNode;
 
     // Use native method
-    auto LdrpHandleTlsData = GetSymbolAddress( _process.modules(), LdrpHandleTlsDataRva, mod.type );
+    auto LdrpHandleTlsData = GetSymbolAddress( _process, LdrpHandleTlsDataRva, mod.type );
     if (!LdrpHandleTlsData)
         return LdrpHandleTlsData.status;
 
@@ -203,11 +203,11 @@ NTSTATUS NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
         LdrpInvertedFunctionTableRva = GetSymbols().LdrpInvertedFunctionTable32;
     }
 
-    auto insertFn = GetSymbolAddress( _process.modules(), RtlInsertInvertedFunctionTableRva, mod.type );
+    auto insertFn = GetSymbolAddress( _process, RtlInsertInvertedFunctionTableRva, mod.type );
     if (!insertFn)
         return insertFn.status;
 
-    auto invertedTable = GetSymbolAddress( _process.modules(), LdrpInvertedFunctionTableRva, mod.type );
+    auto invertedTable = GetSymbolAddress( _process, LdrpInvertedFunctionTableRva, mod.type );
     if (!invertedTable)
         return invertedTable.status;
 
@@ -312,7 +312,7 @@ NTSTATUS NtLdr::UnloadTLS( const NtLdrEntry& mod, bool noThread /*= false*/ )
     if (mod.type == mt_mod32)
         LdrpReleaseTlsEntryRva = GetSymbols().LdrpReleaseTlsEntry32;
 
-    auto LdrpReleaseTlsEntry = GetSymbolAddress( _process.modules(), LdrpReleaseTlsEntryRva, mod.type );
+    auto LdrpReleaseTlsEntry = GetSymbolAddress( _process, LdrpReleaseTlsEntryRva, mod.type );
     if (!LdrpReleaseTlsEntry)
         return LdrpReleaseTlsEntry.status;
 

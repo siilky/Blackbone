@@ -6,6 +6,7 @@
 - `src/BlackBoneDrv/` contains the C kernel driver and its separate solution.
 - `src/BlackBoneTest/` contains native C++ tests; `Testing/` supplies prebuilt helper executables and DLLs.
 - `src/Samples/` demonstrates library usage; its `MinimalSample` target only attaches and reads memory, so its linked size is the library's fixed cost for any consumer. `src/PythonicBlackBone/` contains a ctypes-based Python wrapper and a manual memory-access example.
+- `src/SymbolCatalogGen/` generates the committed ntdll fingerprint catalog `src/BlackBone/Symbols/SymbolCatalogData.cpp` ([ADR 0004](docs/adr/0004-ntdll-fingerprint-catalog.md)); it builds only in the static presets.
 - `src/3rd_party/` holds bundled dependencies. `.github/workflows/` defines library/test and driver builds. `scripts/` holds build tooling. Generated library outputs belong under `build/`.
 
 ## Build, Test, and Development Commands
