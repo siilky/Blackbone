@@ -24,7 +24,7 @@ RemoteHook::~RemoteHook()
 /// <summary>
 /// Debug selected process
 /// </summary>
-/// <returns>true on success</returns>
+/// <returns>Status code; a failed debugger attach returns its status</returns>
 NTSTATUS RemoteHook::EnsureDebug()
 {
     if (_core.pid() == 0)
@@ -54,7 +54,28 @@ NTSTATUS RemoteHook::EnsureDebug()
 
     // Create debug event thread
     _hEventThd = CreateThread( NULL, 0, &RemoteHook::EventThreadWrap, this, 0, NULL );
-    return (_hEventThd != NULL) ? STATUS_SUCCESS : LastNtStatus();
+    if (_hEventThd == NULL)
+        return LastNtStatus();
+
+    // Callers arm breakpoints only after success, so wait until the event thread has attached the debugger.
+    // A thread that exits first has failed DebugActiveProcess and returned its status; close it here so
+    // the next attempt starts a new thread instead of failing on the stale handle.
+    DWORD exitCode = 0;
+    GetExitCodeThread( _hEventThd, &exitCode );
+    while (!_active && exitCode == STILL_ACTIVE)
+    {
+        Sleep( 10 );
+        GetExitCodeThread( _hEventThd, &exitCode );
+    }
+
+    if (!_active)
+    {
+        CloseHandle( _hEventThd );
+        _hEventThd = NULL;
+        return static_cast<NTSTATUS>(exitCode);
+    }
+
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -86,15 +107,6 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
     NTSTATUS status = EnsureDebug();
     if (!NT_SUCCESS( status ))
         return status;
-
-    // Wait for debug event thread
-    DWORD exitCode = 0;
-    GetExitCodeThread( _hEventThd, &exitCode );
-    while (!_active && exitCode == STILL_ACTIVE)
-    {
-        Sleep( 10 );
-        GetExitCodeThread( _hEventThd, &exitCode );
-    }
 
     HookData data = { { 0 } };
 

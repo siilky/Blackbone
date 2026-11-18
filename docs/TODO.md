@@ -6,12 +6,6 @@
 - **Action**: add `asmjit/asmjit` as a submodule pinned to a tagged or reviewed commit, build it from the CMake project with static embedding, and port every code generator: `Asm/AsmHelper32.cpp`, `Asm/AsmHelper64.cpp`, `AsmVariant`/`AsmStack`, `ManualMap/MMap.cpp`, `Process/ProcessModules.cpp`, `Process/RPC/RemoteExec.cpp`, `Process/RPC/RemoteMemory.cpp`, `Process/RPC/RemoteLocalHook.cpp`, local hooks, and the tests. Code emitted for a remote process must be relocated to the remote base address, and a 32-bit build must still emit x64 code for WOW64 targets (`AsmHelper64` from an x86 host).
 - **Done when**: `src/3rd_party/AsmJit` is gone, the submodule builds in every CMake preset for x86 and x64, and the native test suite shows no new failures against the pre-upgrade baseline on both architectures, including the WOW64 paths.
 
-## Recover `RemoteHook` after a failed debugger attach
-
-- **Problem**: `RemoteHook::EnsureDebug` starts the debug event thread, stores it in `_hEventThd`, and returns `STATUS_SUCCESS` before the thread runs `DebugActiveProcess`. When that call fails, `EventThread` exits with the failure as its exit code, without setting `_debugPID` or `_active` and without clearing `_hEventThd`. `ApplyP` waits until `_active` is set or the thread exits, then continues either way: the first `Apply` writes the `int3` or sets the debug registers, stores the hook, and returns `STATUS_SUCCESS` with no debugger attached, so the target gets an unhandled breakpoint exception when it reaches the address. Every later `Apply` sees the stale `_hEventThd` and returns `STATUS_TOO_MANY_THREADS` until `reset()`. `AddReturnHook` does not call `EnsureDebug`; it accepts an address the falsely successful `Apply` stored.
-- **Action**: make the `DebugActiveProcess` result observable before `ApplyP` arms anything (for example, wait for the thread to report it), return it from `Apply`, write no breakpoint on failure, and leave no stale event thread behind.
-- **Done when**: a hook applied to a process that cannot be debugged returns the attach failure status and changes nothing in the target, and a second attempt returns the same status rather than `STATUS_TOO_MANY_THREADS`; covered by a test.
-
 ## Separate the status from the thread exit code in `RemoteExec::ExecDirect`
 
 - **Problem**: `ExecDirect` returns a `DWORD` that is either an `NTSTATUS` from thread creation or the remote thread's exit code, so a caller cannot tell a failed call from a function that returned the same value. Callers that expect an exit code misread a creation failure:

@@ -174,7 +174,7 @@ private:
     /// <summary>
     /// Debug selected process
     /// </summary>
-    /// <returns>true on success</returns>
+    /// <returns>Status code; a failed debugger attach returns its status</returns>
     NTSTATUS EnsureDebug();
 
     /// <summary>

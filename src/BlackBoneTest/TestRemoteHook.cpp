@@ -129,5 +129,28 @@ namespace Testing
             AssertEx::AreEqual( hooker.arguments[4], DWORD64( MEM_RESERVE | MEM_COMMIT ) );
             AssertEx::AreEqual( hooker.arguments[5], DWORD64( PAGE_EXECUTE_READWRITE ) );
         }
+
+        TEST_METHOD( FailedAttach )
+        {
+            // A process cannot debug itself, so the debugger attach fails deterministically.
+            // The target is data that never executes, so a wrongly written int3 crashes nothing.
+            static uint8_t target = 0x90;
+            auto ptr = reinterpret_cast<uintptr_t>(&target);
+
+            Process proc;
+            AssertEx::NtSuccess( proc.Attach( GetCurrentProcessId() ) );
+
+            NTSTATUS status = proc.hooks().Apply( RemoteHook::int3, ptr, nullptr );
+            AssertEx::AreEqual( STATUS_ACCESS_DENIED, status );
+            AssertEx::AreEqual( uint8_t( 0x90 ), target );
+
+            // The failed attempt leaves no event thread behind, so a retry fails the same way
+            NTSTATUS retry = proc.hooks().Apply( RemoteHook::int3, ptr, nullptr );
+            AssertEx::AreNotEqual( STATUS_TOO_MANY_THREADS, retry );
+            AssertEx::AreEqual( status, retry );
+            AssertEx::AreEqual( uint8_t( 0x90 ), target );
+
+            AssertEx::AreEqual( STATUS_NOT_FOUND, proc.hooks().AddReturnHook( ptr, nullptr ) );
+        }
     };
 }
