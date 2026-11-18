@@ -53,10 +53,9 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
 }
 
 /// <summary>
-/// Attach to existing process
+/// Attach to existing process by handle
 /// </summary>
-/// <param name="pid">Process ID</param>
-/// <param name="access">Access mask</param>
+/// <param name="handle">Process handle</param>
 /// <returns>Status</returns>
 NTSTATUS ProcessCore::Open( HANDLE handle )
 {
@@ -65,12 +64,20 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
     if (pid == 0)
         return LastNtStatus();
 
-    _hProcess = handle;
-    _pid = pid;
+    // Some routines in win10 do not support pseudo handle. The replacement is opened before
+    // the caller's handle is taken: on failure the object stays unattached and the caller keeps its handle
+    HANDLE owned = handle;
+    if (pid == GetCurrentProcessId())
+    {
+        owned = OpenProcess( PROCESS_ALL_ACCESS, FALSE, pid );
+        if (!owned)
+            return LastNtStatus();
+    }
 
-    // Some routines in win10 do not support pseudo handle
-    if (_pid == GetCurrentProcessId())
-        _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, _pid );
+    // Taking the caller's handle first makes the assignment of the replacement close it
+    _hProcess = handle;
+    _hProcess = owned;
+    _pid = pid;
 
     return Init();
 }

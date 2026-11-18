@@ -92,7 +92,7 @@ private:
     /// <summary>
     /// Attach to existing process by handle
     /// </summary>
-    /// <param name="pid">Process handle</param>
+    /// <param name="handle">Process handle</param>
     /// <returns>Status</returns>
     NTSTATUS Open( HANDLE handle );
 

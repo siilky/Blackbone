@@ -38,9 +38,9 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 }
 
 /// <summary>
-/// Attach to existing process
+/// Attach to existing process by handle
 /// </summary>
-/// <param name="pid">Process handle</param>
+/// <param name="hProc">Process handle</param>
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( HANDLE hProc )
 {

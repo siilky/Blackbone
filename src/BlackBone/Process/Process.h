@@ -110,9 +110,13 @@ public:
     BLACKBONE_API NTSTATUS Attach( const wchar_t* name, DWORD access = DEFAULT_ACCESS_P );
 
     /// <summary>
-    /// Attach to existing process
+    /// Attach to existing process by handle
     /// </summary>
-    /// <param name="pid">Process handle</param>
+    /// <param name="hProc">
+    /// Process handle. On success the object owns it and closes it when destroyed; on failure the caller keeps it.
+    /// For the current process the handle is replaced by a new PROCESS_ALL_ACCESS handle and closed
+    /// (a pseudo handle is not), so that new handle must be openable, otherwise the call fails
+    /// </param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS Attach( HANDLE hProc );
 

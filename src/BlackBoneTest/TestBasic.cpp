@@ -1,4 +1,5 @@
 #include "Common.h"
+#include <sddl.h>
 
 namespace Testing
 {		
@@ -113,6 +114,60 @@ namespace Testing
             AssertEx::AreEqual( STATUS_ALREADY_INITIALIZED, proc.CreateAndAttach( GetTestHelperHost32(), true, false ) );
             AssertEx::AreEqual( helpers, Process::EnumByName( L"TestHelper32.exe" ).size() );
 
+            AssertEx::AreEqual( GetCurrentProcessId(), proc.pid() );
+        }
+
+        TEST_METHOD( AttachOwnHandleReopenFails )
+        {
+            HANDLE handle = OpenProcess( PROCESS_QUERY_LIMITED_INFORMATION, FALSE, GetCurrentProcessId() );
+            AssertEx::IsTrue( handle != nullptr );
+
+            DWORD size = 0;
+            GetKernelObjectSecurity( GetCurrentProcess(), DACL_SECURITY_INFORMATION, nullptr, 0, &size );
+            std::vector<uint8_t> savedDacl( size );
+            AssertEx::IsTrue( GetKernelObjectSecurity( GetCurrentProcess(), DACL_SECURITY_INFORMATION, savedDacl.data(), size, &size ) != FALSE );
+
+            // Restores the process DACL even when an assertion unwinds the test
+            struct DaclRestore
+            {
+                std::vector<uint8_t>& dacl;
+                ~DaclRestore() { SetKernelObjectSecurity( GetCurrentProcess(), DACL_SECURITY_INFORMATION, dacl.data() ); }
+            };
+
+            Process proc;
+            NTSTATUS status = STATUS_SUCCESS;
+
+            {
+                DaclRestore restore { savedDacl };
+
+                // The owner may only query limited information, so the full-access reopen is denied
+                PSECURITY_DESCRIPTOR sd = nullptr;
+                AssertEx::IsTrue( ConvertStringSecurityDescriptorToSecurityDescriptorW( L"D:(A;;0x1000;;;OW)", SDDL_REVISION_1, &sd, nullptr ) != FALSE );
+                BOOL applied = SetKernelObjectSecurity( GetCurrentProcess(), DACL_SECURITY_INFORMATION, sd );
+                LocalFree( sd );
+                AssertEx::IsTrue( applied != FALSE );
+
+                // SeDebugPrivilege of an elevated host bypasses the DACL, so the failure cannot be produced
+                HANDLE full = OpenProcess( PROCESS_ALL_ACCESS, FALSE, GetCurrentProcessId() );
+                if (full)
+                {
+                    CloseHandle( full );
+                    CloseHandle( handle );
+                    Logger::WriteMessage( "Skipped: the process DACL does not restrict this host" );
+                    return;
+                }
+
+                AssertEx::AreEqual( DWORD( ERROR_ACCESS_DENIED ), GetLastError() );
+                status = proc.Attach( handle );
+            }
+
+            // A failed attach neither attaches nor takes the caller's handle
+            AssertEx::AreEqual( STATUS_ACCESS_DENIED, status );
+            AssertEx::AreEqual( 0ul, proc.pid() );
+            AssertEx::AreEqual( GetCurrentProcessId(), GetProcessId( handle ) );
+
+            // The object stays retryable and owns the handle after success
+            AssertEx::NtSuccess( proc.Attach( handle ) );
             AssertEx::AreEqual( GetCurrentProcessId(), proc.pid() );
         }
 

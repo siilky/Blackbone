@@ -17,12 +17,6 @@
 - **Action**: return `call_result_t<DWORD>` (or an `NTSTATUS` with the exit code as an output) and update its callers: `Process::EnsureInit`, `ProcessModules::Inject`, `ProcessModules::InjectPureIL`, `MMap::CreateActx`, and `Samples/Main.cpp`. Before fixing only the status on the `CreateActx` WOW64 path, check whether that path works.
 - **Done when**: no caller interprets a thread exit code as a status or the reverse; covered by a test that executes a function returning a failure-like value.
 
-## Keep `ProcessCore::Open( HANDLE )` consistent when reopening the current process
-
-- **Problem**: `Open( HANDLE )` for the current process takes the caller's handle, then assigns `OpenProcess( PROCESS_ALL_ACCESS )` over it, which closes the caller's handle (except the pseudo-handle) whether or not `OpenProcess` succeeds. `ProcessCore::Init` always returns `STATUS_SUCCESS`, so when `OpenProcess` fails, `Attach( HANDLE )` reports success while the object keeps the current pid with a null handle: every operation fails, and a retry returns `STATUS_ALREADY_INITIALIZED`, contrary to [ADR 0001](adr/0001-process-binds-one-target.md), rule 1. `OpenProcess` on the own process can fail when the process token or DACL denies the process full access to itself (restricted-token sandboxes, AppContainer, hardened process DACLs); this was not observed.
-- **Action**: open the replacement handle before taking the caller's handle, and on failure return the status without changing the object and without closing the caller's handle.
-- **Done when**: a failed reopen returns the `OpenProcess` status and leaves the `Process` unattached and retryable; the behavior is documented at `Attach( HANDLE )`.
-
 ## Report missing RPC environments in `NtLdr` and `MExcept`
 
 - **Problem**: of the eight `RemoteExec::ExecInWorkerThread` calls in `NtLdr` and `MExcept`, five discard the status:
