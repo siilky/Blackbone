@@ -29,7 +29,7 @@ $env:_NT_SYMBOL_PATH = "srv*<store>"
 build/x64-static-mt/Release/SymbolCatalogGen.exe src/BlackBone/Symbols/SymbolCatalogData.cpp <store>\ntdll.dll C:\Windows\System32\ntdll.dll C:\Windows\SysWOW64\ntdll.dll
 ```
 
-The download is the only step that uses the network; `Get-Help ./scripts/Get-NtdllBuilds.ps1 -Detailed` owns its parameters. In the diff, check the `covers` comments for builds that dropped out, and review the calling convention of each new entry before committing ([ADR 0004](../adr/0004-ntdll-fingerprint-catalog.md), decision 4).
+The download is the only step that uses the network; `Get-Help ./scripts/Get-NtdllBuilds.ps1 -Detailed` owns its parameters. In the diff, check the `covers` comments for builds that dropped out, and before committing review the calling convention of each new entry and of each entry that newly covers a release, because equal leading bytes do not prove an equal function body ([ADR 0004](../adr/0004-ntdll-fingerprint-catalog.md), decision 4). For the review, open a store image with `cdb -z <store>\ntdll.dll\<key>\ntdll.dll -y srv*<store>` and disassemble with `u ntdll!<symbol>`: `uf` interleaves blocks of other functions in address order, and cdb drops the rest of a `-c` command list after a symbol it cannot resolve.
 
 ## Local environment
 
