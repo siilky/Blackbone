@@ -2,6 +2,7 @@
 
 #include "Imports.h"
 #include "NativeStructs.h"
+#include "BlackBoneDef.h"
 
 // Module type
 typedef enum _ModType
@@ -32,7 +33,7 @@ typedef struct _MODULE_DATA
     UNICODE_STRING fullPath;    // Full file path
     SIZE_T size;                // Size of image
     ModType type;               // Module type
-    enum KMmapFlags flags;      // Flags
+    KMmapFlags flags;      // Flags
     BOOLEAN manual;             // Image is manually mapped
     BOOLEAN initialized;        // DllMain was already called
 } MODULE_DATA, *PMODULE_DATA;
@@ -152,7 +153,7 @@ NTSTATUS BBMapUserImage(
     IN PUNICODE_STRING path,
     IN PVOID buffer, IN ULONG_PTR size,
     IN BOOLEAN asImage,
-    IN enum KMmapFlags flags,
+    IN KMmapFlags flags,
     IN ULONG initRVA,
     IN PWCH initArg,
     OUT PMODULE_DATA pImage
@@ -173,7 +174,7 @@ NTSTATUS BBResolveImageRefs(
     IN PEPROCESS pProcess,
     IN BOOLEAN wow64Image,
     IN PMMAP_CONTEXT pContext,
-    IN enum KMmapFlags flags
+    IN KMmapFlags flags
     );
 
 /// <summary>
