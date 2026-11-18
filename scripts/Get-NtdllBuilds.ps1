@@ -3,8 +3,10 @@
 Download ntdll.dll builds and their PDBs into a local single-tier symbol store.
 
 .DESCRIPTION
-Reads the Winbindex metadata of ntdll.dll and selects the builds of Windows 10 22H2 (19045),
-Windows 11 23H2 (22631) and Windows 11 24H2 (26100) for x64 (System32) and x86 (SysWOW64).
+Reads the Winbindex metadata of ntdll.dll and selects the builds of every Windows 10 and 11 release it indexes
+for x64 (System32) and x86 (SysWOW64). A release is the build number in the ntdll file version: releases that
+share a servicing branch share it, for example 19041 for Windows 10 2004 through 22H2 and 22621 for Windows 11
+22H2 and 23H2.
 Builds that share TimeDateStamp and SizeOfImage on one architecture are downloaded once.
 Entries without a timestamp or virtual size are skipped.
 
@@ -27,8 +29,8 @@ The exit code is nonzero when any build failed.
 param(
     # Root of the symbol store; created when missing
     [Parameter(Mandatory)] [string] $Store,
-    # Releases to download
-    [ValidateSet('19045', '22631', '26100')] [string[]] $Release = @('19045', '22631', '26100'),
+    # Releases to download, as ntdll file version build numbers; all releases when omitted
+    [int[]] $Release,
     # Newest N builds per release and architecture; all builds when omitted
     [ValidateRange(1, [int]::MaxValue)] [int] $Limit
 )
@@ -44,9 +46,6 @@ $gzip = [System.IO.Compression.GZipStream]::new($http.GetStreamAsync($winbindexU
 $index = [System.IO.StreamReader]::new($gzip).ReadToEnd() | ConvertFrom-Json -AsHashtable
 
 # --- selection ---
-# Winbindex sets per release; 22631 shares the 22H2 and 23H2 sets and only takes builds from the 2428 update on
-$releaseSets = @{ '19045' = , '22H2'; '22631' = '11-22H2', '11-23H2'; '26100' = , '11-24H2' }
-$minVersion = @{ '22631' = [version]'10.0.22621.2428' }
 $machineArch = @{ 34404 = 'x64'; 332 = 'x86' }
 
 $selected = foreach ($entry in $index.Values) {
@@ -62,16 +61,13 @@ $selected = foreach ($entry in $index.Values) {
     if (-not $versionText) { continue }
     $version = [version]($versionText -split ' ')[0]
 
-    foreach ($rel in $Release) {
-        if (-not ($entry.windowsVersions.Keys | Where-Object { $_ -in $releaseSets[$rel] })) { continue }
-        if ($minVersion[$rel] -and $version -lt $minVersion[$rel]) { continue }
+    if ($Release -and $version.Build -notin $Release) { continue }
 
-        [pscustomobject]@{
-            Release = $rel
-            Arch    = $arch
-            Version = $version
-            Key     = '{0:X8}{1:X}' -f [uint32]$info.timestamp, [uint32]$info.virtualSize
-        }
+    [pscustomobject]@{
+        Release = $version.Build
+        Arch    = $arch
+        Version = $version
+        Key     = '{0:X8}{1:X}' -f [uint32]$info.timestamp, [uint32]$info.virtualSize
     }
 }
 
@@ -82,6 +78,9 @@ $selected = $selected | Sort-Object Release, Arch, @{ Expression = 'Version'; De
         $builds = $_.Group | Where-Object { $seen.Add($_.Key) }
         if ($Limit) { $builds | Select-Object -First $Limit } else { $builds }
     }
+
+# -Release takes ntdll build numbers, so a marketing build such as 19045 matches nothing
+if (-not $selected) { throw "No ntdll build matches -Release $($Release -join ', ')" }
 # --- end selection ---
 
 # Returns TimeDateStamp, SizeOfImage and the PDB name and key (GUID and Age) from the RSDS record of a PE file
