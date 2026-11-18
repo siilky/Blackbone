@@ -44,8 +44,9 @@ const SymbolInfo g_symbols[] =
     { CatalogSymbol::LdrProtectMrdata,              "LdrProtectMrdata",              false },
 };
 
-// Functions that address the start of LdrpInvertedFunctionTable, in order of preference
-const char* const g_dataReferrers[] = { "RtlpInsertInvertedFunctionTableEntry", "RtlxRemoveInvertedFunctionTable" };
+// Functions that address the start of LdrpInvertedFunctionTable, in order of preference;
+// before 15063 the first two do not exist and RtlInsertInvertedFunctionTable addresses the table itself
+const char* const g_dataReferrers[] = { "RtlpInsertInvertedFunctionTableEntry", "RtlxRemoveInvertedFunctionTable", "RtlInsertInvertedFunctionTable" };
 
 struct Build
 {
@@ -392,7 +393,7 @@ bool ReadFingerprint( const Build& build, uint32_t start, std::vector<uint8_t>& 
     return true;
 }
 
-bool MakeRecord( const Build& build, CatalogSymbol symbol, Record& record )
+bool MakeRecord( const Build& build, const std::vector<std::unique_ptr<Build>>& builds, CatalogSymbol symbol, Record& record )
 {
     const char* name = SymbolName( symbol );
     const uint32_t rva = build.rva.at( symbol );
@@ -462,6 +463,35 @@ bool MakeRecord( const Build& build, CatalogSymbol symbol, Record& record )
     {
         Fail( build, name, "invalid instruction inside the fingerprint" );
         return false;
+    }
+
+    // Agreement between entries turns a wrong match into a miss only while another entry also matches, so a record
+    // must not resolve any input build to a wrong address on its own: an obsolete epoch can match an unrelated
+    // function with the same prologue. Each length is checked, because a prefix that is ambiguous in a build
+    // can become unique, and wrong, when it grows.
+    auto misresolves = [&]( size_t length )
+    {
+        const CatalogEntry entry = { symbol, build.is64, static_cast<uint16_t>(length), record.bytes.data(), record.mask.data(),
+                                     record.operandOffset, record.operandEnd };
+
+        return std::any_of( builds.begin(), builds.end(), [&]( const auto& other )
+        {
+            const auto found = other->rva.find( symbol );
+            if (other->is64 != build.is64 || found == other->rva.end())
+                return false;
+
+            const uint32_t resolved = FindInCatalog( other->image, &entry, 1, symbol );
+            return resolved != 0 && resolved != found->second;
+        } );
+    };
+
+    while (misresolves( size ))
+    {
+        if (++size > valid)
+        {
+            Fail( build, name, "no valid fingerprint length avoids resolving another build to a wrong address" );
+            return false;
+        }
     }
 
     record.bytes.resize( size );
@@ -620,7 +650,7 @@ int wmain( int argc, wchar_t* argv[] )
                 continue;
 
             Record record;
-            if (!MakeRecord( *build, info.symbol, record ))
+            if (!MakeRecord( *build, builds, info.symbol, record ))
                 continue;
 
             // The fingerprint must resolve its own build on its own: this checks the operand arithmetic of data records
