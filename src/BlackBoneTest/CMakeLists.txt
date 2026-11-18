@@ -28,3 +28,8 @@ endif()
 target_include_directories(BlackBoneTest PRIVATE ${UNITTEST_DIR}/include)
 target_link_directories(BlackBoneTest PRIVATE ${UNITTEST_DIR}/lib)
 target_link_libraries(BlackBoneTest PRIVATE BlackBone)
+
+# The test runner reports where an assertion failed only through the stack trace, which it
+# resolves from the test module's PDB; Release produces none by default. /DEBUG alone would
+# switch the linker to /OPT:NOREF, so the default optimizations are restated.
+target_link_options(BlackBoneTest PRIVATE "$<$<CONFIG:Release>:/DEBUG;/OPT:REF;/OPT:ICF>")

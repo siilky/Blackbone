@@ -13,6 +13,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_definitions(UNICODE _UNICODE)
 add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/W3> $<$<COMPILE_LANGUAGE:C,CXX>:/sdl>)
 
+# Release objects carry debug information so that the test module can link with /DEBUG
+# (see BlackBoneTest): on x86 a /LTCG link with /DEBUG fails with LNK1103 on /GL objects
+# compiled without it. Binaries linked without /DEBUG are unaffected.
+add_compile_options($<$<AND:$<CONFIG:Release>,$<COMPILE_LANGUAGE:C,CXX>>:/Z7>)
+
 # Whole-program optimization (/GL, /LTCG) in Release; a static library built this way links
 # only with the same MSVC version, so consumers on another toolset turn it off.
 if(NOT DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
